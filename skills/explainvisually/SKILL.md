@@ -14,7 +14,7 @@ Local services:
 - Frontend: `http://127.0.0.1:5173`
 - API: `http://127.0.0.1:8787`
 
-Before authoring scenes, read the project rules in `/Users/anthonygore/Documents/ChatGPT/Code Explainer/ai-docs.md`.
+Before authoring scenes, read the API and renderer contract in `/Users/anthonygore/Documents/ChatGPT/Code Explainer/api-docs.md`.
 
 ## Workflow
 
@@ -39,7 +39,7 @@ For each scene:
 Scene authoring rules:
 
 - Do not write layout CSS.
-- For HTML, use semantic tags only and approved classes from `ai-docs.md`.
+- For HTML, use semantic tags only and approved classes from `api-docs.md`.
 - For Mermaid, do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
 - Use highlights sparingly to direct attention.
 - Do not send more than one visual type in a scene unless the user explicitly asks for fallback behavior.
@@ -62,7 +62,7 @@ When splitting a scene only to move focus across visual elements, preserve the o
 
 Use the renderer's supported highlight mechanisms:
 
-- Mermaid: approved classes from `ai-docs.md`, `class`, edge IDs, and `linkStyle` when edge focus is needed. Do not emit baseline `classDef` styling.
+- Mermaid: approved classes from `api-docs.md`, `class`, edge IDs, and `linkStyle` when edge focus is needed. Do not emit baseline `classDef` styling.
 - HTML: `mark` or approved classes such as `highlight`, `success`, and `danger`.
 - Code: `focusLines`, `addedLines`, `removedLines`, and `diff`.
 
@@ -96,6 +96,22 @@ After loading scenes, report the saved JSON path to the user so they can use it 
 Do not render videos. Rendering is a separate user-directed step after the user has reviewed the loaded scenes.
 
 # Best practices
+
+## Choosing a scene type
+
+Use `mermaid` for diagrams where automatic layout matters: flows, relationships, state, timelines, and similar visuals.
+
+Use `html` for explanatory text, lists, definitions, comparisons, and tables.
+
+Use `code` for source code, config, terminal-like snippets, and diffs that need syntax highlighting or focused lines.
+
+## Content density
+
+Treat the 16:9 frame like a video canvas. Keep each scene focused on one main idea.
+
+The renderer can scale oversized content down, but dense scaled content becomes hard to read. Keep tables short, usually 2-4 columns and 2-5 body rows. Keep headings and paragraphs concise. Split dense explanations into multiple scenes instead of one crowded scene.
+
+For code, prefer focused excerpts over full files.
 
 ## Highlighting
 
