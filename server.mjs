@@ -1,11 +1,26 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import path from 'node:path';
+import { chromium } from 'playwright';
 
 const PORT = Number(process.env.API_PORT ?? 8787);
 const DEFAULT_MIN_DURATION = 2000;
+const VOICEBOX_URL = process.env.VOICEBOX_URL ?? 'http://127.0.0.1:17493';
+const VOICEBOX_PROFILE = process.env.VOICEBOX_PROFILE ?? 'George';
+const VOICEBOX_ENGINE = process.env.VOICEBOX_ENGINE ?? 'kokoro';
+const RENDER_FRONTEND_URL = process.env.RENDER_FRONTEND_URL ?? 'http://127.0.0.1:5173';
+const RENDERS_DIR = path.resolve('renders');
+const FRAME_WIDTH = 1280;
+const FRAME_HEIGHT = 720;
+const FPS = 30;
+const execFileAsync = promisify(execFile);
 
 const clients = new Set();
 const scenes = [];
+const renderJobs = new Map();
 let currentIndex = 0;
 
 function sendJson(response, status, payload) {
@@ -137,6 +152,229 @@ function extractScenes(payload) {
   return [normalizeScene(payload)];
 }
 
+async function renderSceneAudio(scene, index, renderDir, profile) {
+  if (scene.narration.trim() === '') {
+    return {
+      index,
+      skipped: true,
+      audioPath: null,
+      audioDurationMs: 0,
+      durationMs: scene.minDuration,
+      error: null,
+    };
+  }
+
+  const response = await fetch(`${VOICEBOX_URL}/generate/stream`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      profile_id: profile.id,
+      text: scene.narration,
+      language: profile.language ?? 'en',
+      engine: VOICEBOX_ENGINE,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Voicebox returned ${response.status}: ${await response.text()}`);
+  }
+
+  const audioBuffer = Buffer.from(await response.arrayBuffer());
+  const audioPath = path.join(renderDir, `scene-${String(index + 1).padStart(3, '0')}.wav`);
+  await writeFile(audioPath, audioBuffer);
+
+  const audioDurationMs = getWavDurationMs(audioBuffer);
+
+  return {
+    index,
+    skipped: false,
+    audioPath,
+    audioDurationMs,
+    durationMs: Math.max(audioDurationMs, scene.minDuration),
+    error: null,
+  };
+}
+
+async function renderScenesToVideo(renderId, renderDir, renderScenes, renderedScenes) {
+  renderJobs.set(renderId, { scenes: renderScenes });
+
+  let browser;
+
+  try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({
+      viewport: { width: FRAME_WIDTH, height: FRAME_HEIGHT },
+      deviceScaleFactor: 1,
+    });
+
+    for (const [index] of renderScenes.entries()) {
+      const sceneNumber = String(index + 1).padStart(3, '0');
+      const screenshotPath = path.join(renderDir, `scene-${sceneNumber}.png`);
+      const segmentPath = path.join(renderDir, `segment-${sceneNumber}.mp4`);
+      const renderUrl = `${RENDER_FRONTEND_URL}/capture.html?renderId=${encodeURIComponent(renderId)}&scene=${index}`;
+
+      await page.goto(renderUrl, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__sceneReady === true || Boolean(window.__sceneError), null, { timeout: 15_000 });
+
+      const sceneError = await page.evaluate(() => window.__sceneError ?? null);
+      if (sceneError) throw new Error(`Scene ${index + 1} render failed: ${sceneError}`);
+
+      await page.screenshot({ path: screenshotPath, fullPage: false });
+      await createSceneSegment(screenshotPath, renderedScenes[index], segmentPath);
+      renderedScenes[index].screenshotPath = screenshotPath;
+      renderedScenes[index].segmentPath = segmentPath;
+    }
+
+    const videoPath = path.join(renderDir, 'video.mp4');
+    await concatSegments(renderDir, renderScenes.length, videoPath);
+    await cleanupRenderIntermediates(renderedScenes);
+
+    return videoPath;
+  } finally {
+    if (browser) await browser.close();
+    renderJobs.delete(renderId);
+  }
+}
+
+async function createSceneSegment(screenshotPath, renderedScene, segmentPath) {
+  const durationSeconds = Math.max(renderedScene.durationMs / 1000, 0.001);
+  const commonArgs = [
+    '-y',
+    '-loop',
+    '1',
+    '-framerate',
+    String(FPS),
+    '-i',
+    screenshotPath,
+  ];
+
+  const outputArgs = [
+    '-t',
+    durationSeconds.toFixed(3),
+    '-c:v',
+    'libx264',
+    '-c:a',
+    'aac',
+    '-ar',
+    '44100',
+    '-ac',
+    '2',
+    '-pix_fmt',
+    'yuv420p',
+    '-r',
+    String(FPS),
+    '-vf',
+    `scale=${FRAME_WIDTH}:${FRAME_HEIGHT}:force_original_aspect_ratio=decrease,pad=${FRAME_WIDTH}:${FRAME_HEIGHT}:(ow-iw)/2:(oh-ih)/2`,
+    segmentPath,
+  ];
+
+  if (renderedScene.audioPath) {
+    await execFileAsync('ffmpeg', [
+      ...commonArgs,
+      '-i',
+      renderedScene.audioPath,
+      ...outputArgs,
+    ]);
+    return;
+  }
+
+  await execFileAsync('ffmpeg', [
+    ...commonArgs,
+    '-f',
+    'lavfi',
+    '-i',
+    'anullsrc=channel_layout=stereo:sample_rate=44100',
+    ...outputArgs,
+  ]);
+}
+
+async function concatSegments(renderDir, count, videoPath) {
+  const concatPath = path.join(renderDir, 'segments.txt');
+  const lines = Array.from({ length: count }, (_, index) => {
+    const sceneNumber = String(index + 1).padStart(3, '0');
+    return `file '${path.join(renderDir, `segment-${sceneNumber}.mp4`).replaceAll("'", "'\\''")}'`;
+  });
+
+  await writeFile(concatPath, `${lines.join('\n')}\n`);
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    concatPath,
+    '-c',
+    'copy',
+    videoPath,
+  ]);
+  await rm(concatPath, { force: true });
+}
+
+async function cleanupRenderIntermediates(renderedScenes) {
+  const pathsToRemove = renderedScenes
+    .flatMap((scene) => [scene.audioPath, scene.screenshotPath, scene.segmentPath])
+    .filter(Boolean);
+
+  await Promise.all(pathsToRemove.map((filePath) => rm(filePath, { force: true })));
+
+  for (const scene of renderedScenes) {
+    scene.audioPath = null;
+    delete scene.screenshotPath;
+    delete scene.segmentPath;
+  }
+}
+
+async function getVoiceboxProfile() {
+  const response = await fetch(`${VOICEBOX_URL}/profiles`);
+
+  if (!response.ok) {
+    throw new Error(`Voicebox profiles request returned ${response.status}`);
+  }
+
+  const profiles = await response.json();
+  const profile = profiles.find((item) => item.id === VOICEBOX_PROFILE || item.name === VOICEBOX_PROFILE);
+
+  if (!profile) {
+    throw new Error(`Voicebox profile "${VOICEBOX_PROFILE}" was not found`);
+  }
+
+  return profile;
+}
+
+function getWavDurationMs(buffer) {
+  if (buffer.toString('ascii', 0, 4) !== 'RIFF' || buffer.toString('ascii', 8, 12) !== 'WAVE') {
+    throw new Error('Voicebox did not return a valid WAV file');
+  }
+
+  let offset = 12;
+  let byteRate = null;
+  let dataSize = null;
+
+  while (offset + 8 <= buffer.length) {
+    const chunkId = buffer.toString('ascii', offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const chunkStart = offset + 8;
+
+    if (chunkId === 'fmt ') {
+      byteRate = buffer.readUInt32LE(chunkStart + 8);
+    }
+
+    if (chunkId === 'data') {
+      dataSize = chunkSize;
+      break;
+    }
+
+    offset = chunkStart + chunkSize + (chunkSize % 2);
+  }
+
+  if (!byteRate || !dataSize) {
+    throw new Error('Unable to measure WAV duration');
+  }
+
+  return Math.round((dataSize / byteRate) * 1000);
+}
+
 function broadcast(event, payload) {
   const message = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
 
@@ -185,6 +423,19 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  const renderJobMatch = url.pathname.match(/^\/api\/render_jobs\/([^/]+)\/scenes$/);
+  if (request.method === 'GET' && renderJobMatch) {
+    const renderJob = renderJobs.get(renderJobMatch[1]);
+
+    if (!renderJob) {
+      sendJson(response, 404, { ok: false, error: 'Render job not found' });
+      return;
+    }
+
+    sendJson(response, 200, { scenes: renderJob.scenes });
+    return;
+  }
+
   if (request.method === 'POST' && url.pathname === '/add_scene') {
     try {
       const payload = await readJson(request);
@@ -194,6 +445,84 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, { ok: true });
     } catch (error) {
       sendJson(response, 400, { ok: false, error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === 'POST' && url.pathname === '/render') {
+    const renderId = randomUUID();
+
+    try {
+      const payload = await readJson(request);
+      const renderScenes = extractScenes(payload);
+      const profile = await getVoiceboxProfile();
+      const renderDir = path.join(RENDERS_DIR, renderId);
+      await mkdir(renderDir, { recursive: true });
+
+      const renderedScenes = [];
+
+      for (const [index, scene] of renderScenes.entries()) {
+        try {
+          renderedScenes.push(await renderSceneAudio(scene, index, renderDir, profile));
+        } catch (error) {
+          renderedScenes.push({
+            index,
+            skipped: false,
+            audioPath: null,
+            audioDurationMs: null,
+            durationMs: scene.minDuration,
+            error: error.message,
+          });
+        }
+      }
+
+      const errors = renderedScenes.filter((scene) => scene.error);
+      let videoPath = null;
+      let videoError = null;
+
+      if (errors.length === 0) {
+        try {
+          videoPath = await renderScenesToVideo(renderId, renderDir, renderScenes, renderedScenes);
+        } catch (error) {
+          videoError = error.message;
+          errors.push({ error: videoError });
+        }
+      }
+
+      sendJson(response, errors.length > 0 ? 502 : 200, {
+        ok: errors.length === 0,
+        renderId,
+        renderDir,
+        videoPath,
+        voicebox: {
+          url: VOICEBOX_URL,
+          profile: profile.name,
+          profileId: profile.id,
+          engine: VOICEBOX_ENGINE,
+        },
+        scenes: renderedScenes,
+        video: videoPath
+          ? {
+              path: videoPath,
+              width: FRAME_WIDTH,
+              height: FRAME_HEIGHT,
+              fps: FPS,
+            }
+          : null,
+        videoError,
+        errors,
+      });
+    } catch (error) {
+      sendJson(response, 502, {
+        ok: false,
+        renderId,
+        error: error.message,
+        voicebox: {
+          url: VOICEBOX_URL,
+          profile: VOICEBOX_PROFILE,
+          engine: VOICEBOX_ENGINE,
+        },
+      });
     }
     return;
   }

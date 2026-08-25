@@ -93,6 +93,83 @@ Scene properties:
 
 Each scene must include one of `html`, `mermaid`, or `code`. Do not send more than one scene type unless you intend the frontend to prefer this order: `mermaid`, then `code`, then `html`.
 
+### POST /render
+
+Accepts the same request body shapes as `POST /add_scene`, but does not add scenes to the playback queue. It renders the supplied scenes to an MP4 video.
+
+Current behavior:
+
+- Calls local Voicebox once per scene to render narration audio.
+- Measures each WAV duration.
+- Computes per-scene duration as `max(audioDurationMs, minDuration)`.
+- Captures each scene at 1280x720 through the browser renderer.
+- Muxes each scene with its own audio, concatenates the segments, and writes `renders/<renderId>/video.mp4`.
+- Deletes temporary audio, screenshots, and segment files after the final video is created.
+- Returns errors if Voicebox, the browser renderer, or `ffmpeg` is unavailable.
+
+Voicebox defaults:
+
+```text
+VOICEBOX_URL=http://127.0.0.1:17493
+VOICEBOX_PROFILE=George
+VOICEBOX_ENGINE=kokoro
+RENDER_FRONTEND_URL=http://127.0.0.1:5173
+```
+
+These can be overridden with environment variables when starting the Node API.
+
+Render prerequisites:
+
+- The Vite frontend must be running at `RENDER_FRONTEND_URL`.
+- The Node API must be able to launch Playwright Chromium.
+- `ffmpeg` must be available on `PATH`.
+
+Example:
+
+```sh
+curl -X POST http://127.0.0.1:8787/render \
+  -H 'content-type: application/json' \
+  -d @test-scenes.json
+```
+
+Successful response:
+
+```json
+{
+  "ok": true,
+  "renderId": "uuid",
+  "renderDir": "/absolute/path/to/renders/uuid",
+  "videoPath": "/absolute/path/to/renders/uuid/video.mp4",
+  "voicebox": {
+    "url": "http://127.0.0.1:17493",
+    "profile": "George",
+    "profileId": "profile-id",
+    "engine": "kokoro"
+  },
+  "scenes": [
+    {
+      "index": 0,
+      "skipped": false,
+      "audioPath": null,
+      "audioDurationMs": 2800,
+      "durationMs": 3000,
+      "error": null
+    }
+  ],
+  "video": {
+    "path": "/absolute/path/to/renders/uuid/video.mp4",
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+  },
+  "errors": []
+}
+```
+
+If a scene has blank narration, audio generation is skipped for that scene and `durationMs` is set to `minDuration`.
+
+The returned `audioDurationMs` values are informational. Intermediate WAV files are deleted after successful video creation; only the final MP4 remains in the render directory.
+
 ### GET /api/scenes
 
 Returns the cached scene queue and current scene index.

@@ -75,6 +75,7 @@ Optional:
 ## API
 
 - `POST /add_scene`: accepts one scene, an array of scenes, or `{ "scenes": [...] }`
+- `POST /render`: accepts the same scene payloads and renders a 1280x720 MP4 with local Voicebox, Playwright, and ffmpeg
 - `GET /api/scenes`: returns cached scenes and the current scene index
 - `PUT /api/current_scene`: persists the current scene index
 - `GET /api/events`: streams scene updates with server-sent events
