@@ -58,6 +58,8 @@ Treat these as different cases:
 
 After drafting scenes, review them once for attention cues. If a scene explains multiple steps or elements, split it into adjacent scenes that reuse the same visual while highlighting the active node, edge, table cell, word, or code line.
 
+When splitting a scene only to move focus across visual elements, preserve the original narration as closely as possible. Split it into short fragments instead of expanding it. Fragments may be sentence fragments, phrases, or single words if that keeps the narration compact and aligned with the highlighted element.
+
 Use the renderer's supported highlight mechanisms:
 
 - Mermaid: approved classes from `ai-docs.md`, `class`, edge IDs, and `linkStyle` when edge focus is needed. Do not emit baseline `classDef` styling.
@@ -92,3 +94,81 @@ curl -X POST http://127.0.0.1:8787/add_scene \
 After loading scenes, report the saved JSON path to the user so they can use it for feedback.
 
 Do not render videos. Rendering is a separate user-directed step after the user has reviewed the loaded scenes.
+
+# Best practices
+
+## Highlighting
+
+Try to guide the viewer's attention and link what's on screen with what is being discussed. One way to do this is by highlighting.
+
+For HTML, add the class `highlight` to the element that should be emphasized. Prefer highlighting the smallest useful element: a word, table cell, table row, list item, or short phrase. Do not add layout CSS.
+
+```json
+{
+  "narration": "The path identifies the resource being requested.",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th></tr></thead><tbody><tr><td>Method</td><td>GET</td></tr><tr><td class=\"highlight\">Path</td><td>/products/42</td></tr><tr><td>Headers</td><td>Accept: text/html</td></tr></tbody></table></section>"
+}
+```
+
+For Mermaid flowcharts and graphs, add one of the approved focus classes to the node being discussed. Do not define `classDef` styling in the scene; the frontend supplies those styles.
+
+```json
+{
+  "narration": "The browser starts by sending a request.",
+  "mermaid": "flowchart LR\n  browser[Browser] --> server[Server]\n  server --> browser\n\n  class browser active;"
+}
+```
+
+For code, use `focusLines` for the active line or lines. Use `addedLines`, `removedLines`, or `diff` when explaining a change.
+
+```json
+{
+  "narration": "This line sends the JSON response.",
+  "code": {
+    "language": "javascript",
+    "title": "handler.js",
+    "content": "export function handler(request, response) {\n  const user = findUser(request.params.id);\n  return response.json(user);\n}",
+    "focusLines": [3]
+  }
+}
+```
+
+Ideally the screen should have one obvious thing to focus on, so in most cases you should only highlight one thing per scene.
+
+## Split scenes for focus
+
+Ideally the screen should have one obvious thing to focus on. So what do you do when there is a lot of information on screen like in this example?
+
+```json
+{
+  "narration": "The request describes what the browser wants. It includes a method like GET or POST, a path, headers, and sometimes a body.",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+}
+```
+
+You can split the scene on each focus change by changing the highlight. Be sure to preserve the original narration and repeat the same visual with only highlight changes.
+
+```json
+[
+{
+  "narration": "The request describes what the browser wants. It includes a ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "method like GET or POST, ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr class=\"highlight\"><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "a path, ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr class=\"highlight\"><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "headers, ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr class=\"highlight\"><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "and sometimes a body.",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr class=\"highlight\"><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+}
+]
+```
