@@ -50,8 +50,16 @@ function normalizeScene(scene) {
     throw new Error('Scene narration is required and must be a string');
   }
 
-  if (typeof scene.html !== 'string') {
-    throw new Error('Scene html is required and must be a string');
+  if (scene.html !== undefined && typeof scene.html !== 'string') {
+    throw new Error('Scene html must be a string when provided');
+  }
+
+  if (scene.mermaid !== undefined && typeof scene.mermaid !== 'string') {
+    throw new Error('Scene mermaid must be a string when provided');
+  }
+
+  if (scene.html === undefined && scene.mermaid === undefined) {
+    throw new Error('Scene must include either html or mermaid');
   }
 
   const minDuration = scene.minDuration === undefined
@@ -66,6 +74,7 @@ function normalizeScene(scene) {
     id: randomUUID(),
     narration: scene.narration,
     html: scene.html,
+    mermaid: scene.mermaid,
     minDuration,
     createdAt: new Date().toISOString(),
   };
