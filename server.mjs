@@ -325,6 +325,78 @@ async function cleanupRenderIntermediates(renderedScenes) {
   }
 }
 
+async function writeCaptions(renderDir, renderScenes, renderedScenes) {
+  const captionsPath = path.join(renderDir, 'captions.srt');
+  const blocks = [];
+  let captionIndex = 1;
+  let cursorMs = 0;
+
+  for (const [sceneIndex, scene] of renderScenes.entries()) {
+    const renderedScene = renderedScenes[sceneIndex];
+    const durationMs = Math.max(renderedScene.durationMs ?? scene.minDuration, 1);
+    const sentences = splitCaptionSentences(scene.narration);
+
+    if (sentences.length === 0) {
+      cursorMs += durationMs;
+      continue;
+    }
+
+    const totalWeight = sentences.reduce((sum, sentence) => sum + sentence.length, 0);
+    let sceneCaptionStartMs = cursorMs;
+
+    for (const [sentenceIndex, sentence] of sentences.entries()) {
+      const isLast = sentenceIndex === sentences.length - 1;
+      const sentenceDurationMs = isLast
+        ? cursorMs + durationMs - sceneCaptionStartMs
+        : Math.round((durationMs * sentence.length) / totalWeight);
+      const sentenceEndMs = isLast
+        ? cursorMs + durationMs
+        : Math.min(cursorMs + durationMs, sceneCaptionStartMs + sentenceDurationMs);
+
+      blocks.push([
+        String(captionIndex),
+        `${formatSrtTimestamp(sceneCaptionStartMs)} --> ${formatSrtTimestamp(sentenceEndMs)}`,
+        sentence,
+      ].join('\n'));
+
+      captionIndex += 1;
+      sceneCaptionStartMs = sentenceEndMs;
+    }
+
+    cursorMs += durationMs;
+  }
+
+  await writeFile(captionsPath, `${blocks.join('\n\n')}\n`, 'utf8');
+  return captionsPath;
+}
+
+function splitCaptionSentences(text) {
+  const normalized = text
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return [];
+
+  const matches = normalized.match(/[^.!?]+[.!?]+["')\]]?|[^.!?]+$/g) ?? [normalized];
+  return matches
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function formatSrtTimestamp(ms) {
+  const safeMs = Math.max(0, Math.round(ms));
+  const hours = Math.floor(safeMs / 3_600_000);
+  const minutes = Math.floor((safeMs % 3_600_000) / 60_000);
+  const seconds = Math.floor((safeMs % 60_000) / 1000);
+  const milliseconds = safeMs % 1000;
+
+  return [
+    String(hours).padStart(2, '0'),
+    String(minutes).padStart(2, '0'),
+    String(seconds).padStart(2, '0'),
+  ].join(':') + `,${String(milliseconds).padStart(3, '0')}`;
+}
+
 async function getVoiceboxProfile() {
   const response = await fetch(`${VOICEBOX_URL}/profiles`);
 
@@ -449,12 +521,29 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === 'POST' && url.pathname === '/api/clear_scenes') {
+    scenes.length = 0;
+    currentIndex = 0;
+    broadcast('sync', { scenes, currentIndex });
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
   if (request.method === 'POST' && url.pathname === '/render') {
     const renderId = randomUUID();
 
     try {
-      const payload = await readJson(request);
-      const renderScenes = extractScenes(payload);
+      const renderScenes = scenes.map((scene) => ({ ...scene }));
+
+      if (renderScenes.length === 0) {
+        sendJson(response, 400, {
+          ok: false,
+          renderId,
+          error: 'No scenes are loaded to render',
+        });
+        return;
+      }
+
       const profile = await getVoiceboxProfile();
       const renderDir = path.join(RENDERS_DIR, renderId);
       await mkdir(renderDir, { recursive: true });
@@ -478,11 +567,13 @@ const server = createServer(async (request, response) => {
 
       const errors = renderedScenes.filter((scene) => scene.error);
       let videoPath = null;
+      let captionsPath = null;
       let videoError = null;
 
       if (errors.length === 0) {
         try {
           videoPath = await renderScenesToVideo(renderId, renderDir, renderScenes, renderedScenes);
+          captionsPath = await writeCaptions(renderDir, renderScenes, renderedScenes);
         } catch (error) {
           videoError = error.message;
           errors.push({ error: videoError });
@@ -494,6 +585,7 @@ const server = createServer(async (request, response) => {
         renderId,
         renderDir,
         videoPath,
+        captionsPath,
         voicebox: {
           url: VOICEBOX_URL,
           profile: profile.name,
@@ -507,6 +599,12 @@ const server = createServer(async (request, response) => {
               width: FRAME_WIDTH,
               height: FRAME_HEIGHT,
               fps: FPS,
+            }
+          : null,
+        captions: captionsPath
+          ? {
+              path: captionsPath,
+              format: 'srt',
             }
           : null,
         videoError,

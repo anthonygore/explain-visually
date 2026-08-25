@@ -68,7 +68,7 @@ export async function sceneToDocument(scene) {
 async function mermaidToDocument(diagram) {
   try {
     const renderId = `mermaid-${crypto.randomUUID()}`;
-    const { svg } = await mermaid.render(renderId, diagram);
+    const { svg } = await mermaid.render(renderId, withMermaidFocusClasses(diagram));
     return constrainHtml(`<main class="mermaid-scene">${svg}</main>`, mermaidSceneStyles());
   } catch (error) {
     return constrainHtml(
@@ -76,6 +76,22 @@ async function mermaidToDocument(diagram) {
       mermaidSceneStyles(),
     );
   }
+}
+
+function withMermaidFocusClasses(diagram) {
+  if (!/^\s*(flowchart|graph)\b/i.test(diagram)) {
+    return diagram;
+  }
+
+  return `${diagram.trimEnd()}
+
+  classDef active fill:#fde68a,stroke:#f59e0b,stroke-width:3px,color:#0f172a;
+  classDef highlight fill:#fde68a,stroke:#f59e0b,stroke-width:3px,color:#0f172a;
+  classDef muted fill:#e5e7eb,stroke:#94a3b8,color:#64748b;
+  classDef emphasis fill:#dbeafe,stroke:#2563eb,stroke-width:3px,color:#0f172a;
+  classDef success fill:#dcfce7,stroke:#16a34a,stroke-width:3px,color:#14532d;
+  classDef danger fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#7f1d1d;
+`;
 }
 
 async function codeToDocument(code) {

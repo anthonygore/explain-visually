@@ -33,16 +33,14 @@ Accepted request body shapes:
 ```json
 {
   "narration": "Speakable narration text.",
-  "html": "<section><h1>Title</h1><p>Semantic HTML scene.</p></section>",
-  "minDuration": 2000
+  "html": "<section><h1>Title</h1><p>Semantic HTML scene.</p></section>"
 }
 ```
 
 ```json
 {
   "narration": "Speakable narration text.",
-  "mermaid": "flowchart LR\n  A[Input] --> B[Output]",
-  "minDuration": 2000
+  "mermaid": "flowchart LR\n  A[Input] --> B[Output]"
 }
 ```
 
@@ -54,8 +52,7 @@ Accepted request body shapes:
     "title": "handler.js",
     "content": "export function handler(req, res) {\n  const name = req.query.name ?? 'world';\n  return res.json({ message: `Hello ${name}` });\n}",
     "focusLines": [3]
-  },
-  "minDuration": 3000
+  }
 }
 ```
 
@@ -93,15 +90,34 @@ Scene properties:
 
 Each scene must include one of `html`, `mermaid`, or `code`. Do not send more than one scene type unless you intend the frontend to prefer this order: `mermaid`, then `code`, then `html`.
 
+### POST /api/clear_scenes
+
+Clears the server's current scene queue and resets `currentIndex` to `0`. The API broadcasts a `sync` event so connected frontends update immediately.
+
+Use this before starting a new generated explanation.
+
+Example:
+
+```sh
+curl -X POST http://127.0.0.1:8787/api/clear_scenes
+```
+
+Response:
+
+```json
+{ "ok": true }
+```
+
 ### POST /render
 
-Accepts the same request body shapes as `POST /add_scene`, but does not add scenes to the playback queue. It renders the supplied scenes to an MP4 video.
+Renders the scenes currently loaded in the server queue to an MP4 video. This endpoint does not accept scene payload arguments. Add or preview scenes with `POST /add_scene` first, then call `POST /render` when the current queue should become a video.
 
 Current behavior:
 
 - Calls local Voicebox once per scene to render narration audio.
 - Measures each WAV duration.
 - Computes per-scene duration as `max(audioDurationMs, minDuration)`.
+- Splits each scene narration into sentence-level SRT captions and writes `renders/<renderId>/captions.srt`.
 - Captures each scene at 1280x720 through the browser renderer.
 - Muxes each scene with its own audio, concatenates the segments, and writes `renders/<renderId>/video.mp4`.
 - Deletes temporary audio, screenshots, and segment files after the final video is created.
@@ -128,8 +144,7 @@ Example:
 
 ```sh
 curl -X POST http://127.0.0.1:8787/render \
-  -H 'content-type: application/json' \
-  -d @test-scenes.json
+  -H 'content-type: application/json'
 ```
 
 Successful response:
@@ -140,6 +155,7 @@ Successful response:
   "renderId": "uuid",
   "renderDir": "/absolute/path/to/renders/uuid",
   "videoPath": "/absolute/path/to/renders/uuid/video.mp4",
+  "captionsPath": "/absolute/path/to/renders/uuid/captions.srt",
   "voicebox": {
     "url": "http://127.0.0.1:17493",
     "profile": "George",
@@ -162,13 +178,17 @@ Successful response:
     "height": 720,
     "fps": 30
   },
+  "captions": {
+    "path": "/absolute/path/to/renders/uuid/captions.srt",
+    "format": "srt"
+  },
   "errors": []
 }
 ```
 
 If a scene has blank narration, audio generation is skipped for that scene and `durationMs` is set to `minDuration`.
 
-The returned `audioDurationMs` values are informational. Intermediate WAV files are deleted after successful video creation; only the final MP4 remains in the render directory.
+The returned `audioDurationMs` values are informational. Intermediate WAV files are deleted after successful video creation; the final MP4 and SRT file remain in the render directory.
 
 ### GET /api/scenes
 
@@ -234,12 +254,13 @@ Example:
 ```json
 {
   "narration": "The request moves from the browser to the API, then back to the frontend.",
-  "mermaid": "flowchart LR\n  A[Browser] --> B[Node API]\n  B --> C[SSE]\n  C --> D[Frontend]",
-  "minDuration": 2500
+  "mermaid": "flowchart LR\n  A[Browser] --> B[Node API]\n  B --> C[SSE]\n  C --> D[Frontend]"
 }
 ```
 
-Prefer simple diagrams. Use node classes and edge IDs when highlighting is needed.
+Prefer simple diagrams. The frontend owns baseline Mermaid styling. Do not include `themeVariables`, broad `classDef` blocks, or styling whose purpose is to make the base diagram look nicer.
+
+For flowcharts and graphs, the frontend injects these approved focus classes: `active`, `highlight`, `muted`, `emphasis`, `success`, and `danger`. Apply those classes to nodes when narration needs to focus attention. Do not define the class styling yourself.
 
 Example:
 
@@ -248,9 +269,10 @@ flowchart LR
   A[Browser] e1@--> B[Node API]
   B --> C[SSE]
 
-  classDef active fill:#fde68a,stroke:#f59e0b,stroke-width:3px,color:#0f172a;
   class B active;
 ```
+
+When reusing a diagram across adjacent scenes, keep the underlying diagram structurally stable. Make the smallest change needed to express the new focus, usually only class assignments or edge highlighting. Do not change labels, ordering, wording, or layout unless the scene is intentionally introducing a new version of the visual.
 
 ## HTML Scenes
 
