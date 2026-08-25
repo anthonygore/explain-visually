@@ -66,7 +66,7 @@ curl -X POST http://127.0.0.1:8787/add_scene \
 Each scene requires:
 
 - `narration`: speakable text string
-- either `mermaid`: Mermaid diagram string, or `html`: raw scene HTML
+- one of `mermaid`: Mermaid diagram string, `html`: semantic scene HTML, or `code`: syntax-highlighted code scene object
 
 Optional:
 

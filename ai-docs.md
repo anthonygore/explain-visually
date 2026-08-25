@@ -47,6 +47,19 @@ Accepted request body shapes:
 ```
 
 ```json
+{
+  "narration": "Focus on the return statement.",
+  "code": {
+    "language": "javascript",
+    "title": "handler.js",
+    "content": "export function handler(req, res) {\n  const name = req.query.name ?? 'world';\n  return res.json({ message: `Hello ${name}` });\n}",
+    "focusLines": [3]
+  },
+  "minDuration": 3000
+}
+```
+
+```json
 [
   {
     "narration": "First scene.",
@@ -73,11 +86,12 @@ Accepted request body shapes:
 Scene properties:
 
 - `narration`: required string. Text spoken by the browser.
-- `html`: optional string. Semantic scene markup. Required if `mermaid` is not provided.
-- `mermaid`: optional string. Mermaid diagram source. Required if `html` is not provided.
+- `html`: optional string. Semantic scene markup.
+- `mermaid`: optional string. Mermaid diagram source.
+- `code`: optional object. Syntax-highlighted code scene.
 - `minDuration`: optional non-negative number in milliseconds. Defaults to `2000`.
 
-Do not send both `html` and `mermaid` unless you intend the frontend to prefer `mermaid`.
+Each scene must include one of `html`, `mermaid`, or `code`. Do not send more than one scene type unless you intend the frontend to prefer this order: `mermaid`, then `code`, then `html`.
 
 ### GET /api/scenes
 
@@ -128,9 +142,11 @@ Health check.
 
 Use `mermaid` for diagrams where automatic layout matters: flows, graphs, sequences, timelines, mind maps, state diagrams, and similar visuals.
 
+Use `code` for source code, config, terminal-like snippets, and diffs that need syntax highlighting or focused lines.
+
 Use `html` for text, lists, tables, code snippets, headings, and mixed explanatory content.
 
-All rendered scenes sit inside a fixed 16:9 frame. Semantic HTML scenes are automatically scaled down when their content would overflow the frame. This prevents clipping, but small scaled content can become hard to read. Prefer concise scenes with one main idea, short tables, and limited text.
+All rendered scenes sit inside a fixed 16:9 frame. Treat this like a video canvas: the renderer lays scenes out on a 1280x720 design surface, then scales that surface to the visible container. Semantic HTML and code scenes are also scaled down internally when their content would overflow the design surface. This prevents clipping, but small scaled content can become hard to read. Prefer concise scenes with one main idea, short tables, and limited text.
 
 ## Mermaid Scenes
 
@@ -196,7 +212,9 @@ Use these classes only to express meaning, not layout.
 
 Content sizing rule:
 
-- The renderer will auto-fit oversized semantic HTML by scaling it down.
+- The renderer lays out semantic HTML on a 1280x720 design surface.
+- The full design surface scales to the visible 16:9 container.
+- The renderer will auto-fit oversized semantic HTML by scaling content down inside that design surface.
 - Do not depend on auto-fit for dense content.
 - Keep tables short, usually 2-4 columns and 2-5 body rows.
 - Keep headings and paragraphs concise.
@@ -243,6 +261,51 @@ Bad HTML example:
 ```
 
 The bad example will be sanitized and will not preserve styles, scripts, or unapproved classes.
+
+## Code Scenes
+
+Code scenes render syntax-highlighted code with line numbers. Use them instead of HTML for source code.
+
+Shape:
+
+```json
+{
+  "narration": "The nullish coalescing operator supplies a fallback name.",
+  "code": {
+    "language": "javascript",
+    "title": "handler.js",
+    "content": "export function handler(req, res) {\n  const name = req.query.name ?? 'world';\n  return res.json({ message: `Hello ${name}` });\n}",
+    "focusLines": [2]
+  }
+}
+```
+
+Code properties:
+
+- `content`: required string. The code or diff text to render.
+- `language`: optional string. Examples: `javascript`, `typescript`, `tsx`, `html`, `css`, `json`, `bash`, `diff`. Defaults to `text`.
+- `title`: optional string. Filename or short label shown above the code.
+- `focusLines`: optional array of 1-based line numbers to highlight.
+- `diff`: optional boolean. When true, lines starting with `+` are styled as additions and lines starting with `-` are styled as removals.
+- `addedLines`: optional array of 1-based line numbers to style as additions.
+- `removedLines`: optional array of 1-based line numbers to style as removals.
+
+Diff example:
+
+```json
+{
+  "narration": "The new branch handles Mermaid scenes before falling back to HTML.",
+  "code": {
+    "language": "diff",
+    "title": "scene renderer diff",
+    "diff": true,
+    "content": "-  return semanticHtmlToDocument(scene.html ?? '');\n+  if (scene.code) {\n+    return codeToDocument(scene.code);\n+  }\n+\n+  return semanticHtmlToDocument(scene.html ?? '');",
+    "focusLines": [2, 3]
+  }
+}
+```
+
+Code scenes are laid out on the same 1280x720 design surface and scale with the visible 16:9 container. Oversized snippets are scaled down inside the code frame. Keep snippets short enough to read; prefer focused excerpts over full files.
 
 ## Playback Behavior
 

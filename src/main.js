@@ -1,5 +1,6 @@
 import './styles.css';
 import mermaid from 'mermaid';
+import { codeToHtml } from 'shiki';
 
 const DEFAULT_MIN_DURATION = 2000;
 const ALLOWED_HTML_TAGS = new Set([
@@ -42,8 +43,10 @@ mermaid.initialize({
 });
 
 const frame = document.querySelector('#scene-frame');
+const previousButton = document.querySelector('#previous-button');
 const playToggleButton = document.querySelector('#play-toggle-button');
 const stopButton = document.querySelector('#stop-button');
+const nextButton = document.querySelector('#next-button');
 const status = document.querySelector('#scene-status');
 
 const state = {
@@ -65,6 +68,7 @@ function normalizeScene(scene) {
     narration: scene.narration,
     html: scene.html,
     mermaid: scene.mermaid,
+    code: scene.code,
     minDuration: Number.isFinite(scene.minDuration) && scene.minDuration >= 0
       ? scene.minDuration
       : DEFAULT_MIN_DURATION,
@@ -89,6 +93,10 @@ async function sceneToDocument(scene) {
     return mermaidToDocument(scene.mermaid);
   }
 
+  if (scene.code) {
+    return codeToDocument(scene.code);
+  }
+
   return semanticHtmlToDocument(scene.html ?? '');
 }
 
@@ -103,6 +111,51 @@ async function mermaidToDocument(diagram) {
       mermaidSceneStyles(),
     );
   }
+}
+
+async function codeToDocument(code) {
+  const codeHtml = await codeToHtml(code.content, {
+    lang: code.language || 'text',
+    theme: 'github-dark',
+    transformers: [codeLineTransformer(code)],
+  });
+
+  const title = code.title
+    ? `<header class="code-scene-title">${escapeHtml(code.title)}</header>`
+    : '';
+
+  return constrainHtml(
+    `<main class="code-scene">${title}<div class="code-frame">${codeHtml}</div></main>`,
+    codeSceneStyles(),
+    fitSceneScript('.code-scene', '.code-frame'),
+  );
+}
+
+function codeLineTransformer(code) {
+  const focusLines = new Set(code.focusLines ?? []);
+  const addedLines = new Set(code.addedLines ?? []);
+  const removedLines = new Set(code.removedLines ?? []);
+
+  return {
+    line(node, lineNumber) {
+      const lineText = extractText(node);
+      const classes = ['code-line'];
+
+      if (focusLines.has(lineNumber)) classes.push('is-focused');
+      if (addedLines.has(lineNumber) || (code.diff && lineText.startsWith('+'))) classes.push('is-added');
+      if (removedLines.has(lineNumber) || (code.diff && lineText.startsWith('-'))) classes.push('is-removed');
+
+      node.properties.class = [
+        ...new Set([...(node.properties.class ?? []), ...classes]),
+      ];
+      node.properties['data-line'] = String(lineNumber);
+    },
+  };
+}
+
+function extractText(node) {
+  if (typeof node.value === 'string') return node.value;
+  return (node.children ?? []).map(extractText).join('');
 }
 
 function constrainHtml(html, extraStyles = '', extraScript = '') {
@@ -137,6 +190,43 @@ function constrainHtml(html, extraStyles = '', extraScript = '') {
   </head>
   <body>${html}${extraScript}</body>
 </html>`;
+}
+
+function fitSceneScript(sceneSelector, contentSelector) {
+  return `
+    <script>
+      const SCENE_WIDTH = 1280;
+      const SCENE_HEIGHT = 720;
+      const SAFE_WIDTH = 1184;
+      const SAFE_HEIGHT = 624;
+
+      function fitScene() {
+        const scene = document.querySelector('${sceneSelector}');
+        const content = document.querySelector('${contentSelector}');
+        if (!scene || !content) return;
+
+        const sceneScale = Math.min(window.innerWidth / SCENE_WIDTH, window.innerHeight / SCENE_HEIGHT);
+        scene.style.transform = 'translate(-50%, -50%) scale(' + sceneScale + ')';
+
+        content.style.transform = 'translate(-50%, -50%) scale(1)';
+        content.style.width = '1040px';
+
+        const contentWidth = content.scrollWidth;
+        const contentHeight = content.scrollHeight;
+
+        if (!contentWidth || !contentHeight) return;
+
+        const contentScale = Math.min(1, SAFE_WIDTH / contentWidth, SAFE_HEIGHT / contentHeight);
+        content.style.transform = 'translate(-50%, -50%) scale(' + contentScale + ')';
+      }
+
+      window.addEventListener('load', fitScene);
+      window.addEventListener('resize', fitScene);
+      requestAnimationFrame(fitScene);
+      requestAnimationFrame(() => requestAnimationFrame(fitScene));
+      setTimeout(fitScene, 100);
+    </script>
+  `;
 }
 
 function semanticHtmlToDocument(html) {
@@ -216,18 +306,21 @@ function semanticSceneStyles() {
       }
 
       .semantic-scene-fit {
-        width: 100%;
-        height: 100%;
-        position: relative;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1280px;
+        height: 720px;
         padding: 48px;
         overflow: hidden;
+        transform-origin: center center;
       }
 
       .semantic-scene-content {
         position: absolute;
         top: 50%;
         left: 50%;
-        width: min(calc(100% - 96px), 1040px);
+        width: 1040px;
         transform-origin: center center;
       }
 
@@ -373,33 +466,103 @@ function semanticSceneStyles() {
 }
 
 function semanticSceneScript() {
+  return fitSceneScript('.semantic-scene-fit', '.semantic-scene-content');
+}
+
+function codeSceneStyles() {
   return `
-    <script>
-      function fitScene() {
-        const frame = document.querySelector('.semantic-scene-fit');
-        const content = document.querySelector('.semantic-scene-content');
-        if (!frame || !content) return;
-
-        content.style.transform = 'translate(-50%, -50%) scale(1)';
-        content.style.width = Math.min(Math.max(frame.clientWidth - 96, 1), 1040) + 'px';
-
-        const availableWidth = Math.max(frame.clientWidth - 96, 1);
-        const availableHeight = Math.max(frame.clientHeight - 96, 1);
-        const contentWidth = content.scrollWidth;
-        const contentHeight = content.scrollHeight;
-
-        if (!availableWidth || !availableHeight || !contentWidth || !contentHeight) return;
-
-        const scale = Math.min(1, availableWidth / contentWidth, availableHeight / contentHeight);
-        content.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+      body {
+        color: #dbe5ee;
+        background: #0f1419;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
-      window.addEventListener('load', fitScene);
-      window.addEventListener('resize', fitScene);
-      requestAnimationFrame(fitScene);
-      requestAnimationFrame(() => requestAnimationFrame(fitScene));
-      setTimeout(fitScene, 100);
-    </script>
+      .code-scene {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1280px;
+        height: 720px;
+        padding: 48px;
+        overflow: hidden;
+        transform-origin: center center;
+      }
+
+      .code-scene-title {
+        position: absolute;
+        top: 24px;
+        left: 48px;
+        right: 48px;
+        color: #a7b4c2;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 650;
+      }
+
+      .code-frame {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1040px;
+        overflow: hidden;
+        border: 1px solid #2b3642;
+        border-radius: 8px;
+        background: #0d1117;
+        box-shadow: 0 24px 70px rgb(0 0 0 / 0.32);
+        transform-origin: center center;
+      }
+
+      .code-frame pre {
+        margin: 0 !important;
+        padding: 22px 0 !important;
+        overflow: visible !important;
+        background: transparent !important;
+      }
+
+      .code-frame code {
+        display: grid;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 20px;
+        line-height: 1.5;
+      }
+
+      .code-line {
+        display: block;
+        min-height: 1.5em;
+        padding: 0 24px 0 72px;
+        position: relative;
+        white-space: pre;
+      }
+
+      .code-line::before {
+        content: attr(data-line);
+        position: absolute;
+        left: 24px;
+        width: 30px;
+        color: #6e7681;
+        text-align: right;
+      }
+
+      .code-line.is-focused {
+        background: rgb(251 191 36 / 0.18);
+        box-shadow: inset 4px 0 0 #f59e0b;
+      }
+
+      .code-line.is-added {
+        background: rgb(22 163 74 / 0.2);
+      }
+
+      .code-line.is-added::before {
+        color: #86efac;
+      }
+
+      .code-line.is-removed {
+        background: rgb(220 38 38 / 0.2);
+      }
+
+      .code-line.is-removed::before {
+        color: #fca5a5;
+      }
   `;
 }
 
@@ -458,8 +621,10 @@ function blankScene() {
 function updateStatus() {
   const current = state.scenes.length === 0 ? 0 : state.currentIndex + 1;
   status.textContent = `${current} / ${state.scenes.length}`;
+  previousButton.disabled = state.scenes.length === 0 || state.currentIndex <= 0;
   playToggleButton.disabled = state.scenes.length === 0;
   stopButton.disabled = !state.isPlaying && state.currentIndex === 0;
+  nextButton.disabled = state.scenes.length === 0 || state.currentIndex >= state.scenes.length - 1;
   playToggleButton.setAttribute('aria-label', state.isPlaying && !state.isPaused ? 'Pause' : 'Play');
   playToggleButton.classList.toggle('is-playing', state.isPlaying && !state.isPaused);
 }
@@ -577,23 +742,34 @@ function togglePlayback() {
 }
 
 function stopPlayback() {
-  state.isPlaying = false;
-  state.isPaused = false;
-  state.activeSceneToken += 1;
-  speechSynthesis.cancel();
-  state.activeUtterance = null;
+  cancelActivePlayback();
   state.currentIndex = 0;
   renderScene(state.currentIndex);
   updateStatus();
 }
 
 function finishPlayback() {
+  cancelActivePlayback();
+  renderScene(0);
+  updateStatus();
+}
+
+function cancelActivePlayback() {
   state.isPlaying = false;
   state.isPaused = false;
   state.activeSceneToken += 1;
   speechSynthesis.cancel();
   state.activeUtterance = null;
-  renderScene(0);
+}
+
+async function stepScene(delta) {
+  if (state.scenes.length === 0) return;
+
+  const nextIndex = clampIndex(state.currentIndex + delta);
+  if (nextIndex === state.currentIndex) return;
+
+  cancelActivePlayback();
+  await renderScene(nextIndex);
   updateStatus();
 }
 
@@ -648,8 +824,14 @@ function connectSceneStream() {
   });
 }
 
+previousButton.addEventListener('click', () => {
+  void stepScene(-1);
+});
 playToggleButton.addEventListener('click', togglePlayback);
 stopButton.addEventListener('click', stopPlayback);
+nextButton.addEventListener('click', () => {
+  void stepScene(1);
+});
 
 speechSynthesis.addEventListener('voiceschanged', pickDanielVoice);
 

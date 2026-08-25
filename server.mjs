@@ -58,8 +58,16 @@ function normalizeScene(scene) {
     throw new Error('Scene mermaid must be a string when provided');
   }
 
-  if (scene.html === undefined && scene.mermaid === undefined) {
-    throw new Error('Scene must include either html or mermaid');
+  if (scene.code !== undefined && (!scene.code || typeof scene.code !== 'object' || Array.isArray(scene.code))) {
+    throw new Error('Scene code must be an object when provided');
+  }
+
+  if (scene.html === undefined && scene.mermaid === undefined && scene.code === undefined) {
+    throw new Error('Scene must include html, mermaid, or code');
+  }
+
+  if (scene.code !== undefined) {
+    validateCodeScene(scene.code);
   }
 
   const minDuration = scene.minDuration === undefined
@@ -75,9 +83,52 @@ function normalizeScene(scene) {
     narration: scene.narration,
     html: scene.html,
     mermaid: scene.mermaid,
+    code: scene.code,
     minDuration,
     createdAt: new Date().toISOString(),
   };
+}
+
+function validateCodeScene(code) {
+  if (typeof code.content !== 'string') {
+    throw new Error('Scene code.content is required and must be a string');
+  }
+
+  if (code.language !== undefined && typeof code.language !== 'string') {
+    throw new Error('Scene code.language must be a string when provided');
+  }
+
+  if (code.title !== undefined && typeof code.title !== 'string') {
+    throw new Error('Scene code.title must be a string when provided');
+  }
+
+  if (code.diff !== undefined && typeof code.diff !== 'boolean') {
+    throw new Error('Scene code.diff must be a boolean when provided');
+  }
+
+  if (code.focusLines !== undefined) {
+    validateLineList(code.focusLines, 'code.focusLines');
+  }
+
+  if (code.addedLines !== undefined) {
+    validateLineList(code.addedLines, 'code.addedLines');
+  }
+
+  if (code.removedLines !== undefined) {
+    validateLineList(code.removedLines, 'code.removedLines');
+  }
+}
+
+function validateLineList(value, field) {
+  if (!Array.isArray(value)) {
+    throw new Error(`Scene ${field} must be an array when provided`);
+  }
+
+  for (const line of value) {
+    if (!Number.isInteger(line) || line < 1) {
+      throw new Error(`Scene ${field} entries must be positive integers`);
+    }
+  }
 }
 
 function extractScenes(payload) {

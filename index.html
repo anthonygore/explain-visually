@@ -18,6 +18,11 @@
       </section>
 
       <footer class="controls" aria-label="Playback controls">
+        <button id="previous-button" class="icon-button" type="button" aria-label="Previous scene" disabled>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 6h2v12H7zM10 12l9 6V6z"></path>
+          </svg>
+        </button>
         <button id="play-toggle-button" class="icon-button" type="button" aria-label="Play">
           <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8 5v14l11-7z"></path>
@@ -29,6 +34,11 @@
         <button id="stop-button" class="icon-button" type="button" aria-label="Stop" disabled>
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6h12v12H6z"></path>
+          </svg>
+        </button>
+        <button id="next-button" class="icon-button" type="button" aria-label="Next scene" disabled>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 6v12l9-6zM15 6h2v12h-2z"></path>
           </svg>
         </button>
         <span id="scene-status" class="scene-status">0 / 0</span>
