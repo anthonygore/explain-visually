@@ -1,4 +1,4 @@
-# Code Explainer
+# Explain Visually
 
 A local prototype for previewing and rendering generated visual explainer scenes.
 

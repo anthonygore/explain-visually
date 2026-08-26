@@ -1,4 +1,4 @@
-# Code Explainer API Docs
+# Explain Visually API Docs
 
 This app plays generated explanation scenes in order. Clients add scenes by calling the local Node API. The browser receives scenes through server-sent events, renders the current scene in a fixed 16:9 frame, and speaks the narration with the Web Speech API.
 

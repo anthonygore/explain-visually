@@ -1,14 +1,14 @@
 ---
 name: explainvisually
-description: Create visual explainer scenes using the local Code Explainer app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
+description: Create visual explainer scenes using the local Explain Visually app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
-  version: 2026-08-26-1404
+  version: 2026-08-26-1935
 ---
 
 # Explain Visually
 
-Use the local Code Explainer app as the preview engine for short visual explanations.
+Use the local Explain Visually app as the preview engine for short visual explanations.
 
 Local services:
 
