@@ -1,5 +1,12 @@
 import mermaid from 'mermaid';
 import { codeToHtml } from 'shiki';
+import {
+  mermaidFocusClassDefs,
+  mermaidThemeConfig,
+  sceneTheme,
+  sceneThemeCssVariables,
+  shikiTheme,
+} from './scene-theme.js';
 
 const DEFAULT_MIN_DURATION = 2000;
 const ALLOWED_HTML_TAGS = new Set([
@@ -38,7 +45,7 @@ const ALLOWED_HTML_CLASSES = new Set([
 mermaid.initialize({
   startOnLoad: false,
   securityLevel: 'strict',
-  theme: 'default',
+  ...mermaidThemeConfig(),
 });
 
 export function normalizeScene(scene) {
@@ -53,51 +60,57 @@ export function normalizeScene(scene) {
   };
 }
 
-export async function sceneToDocument(scene) {
+export async function sceneToDocument(scene, options = {}) {
+  const themeName = options.theme;
+
   if (typeof scene.mermaid === 'string') {
-    return mermaidToDocument(scene.mermaid);
+    return mermaidToDocument(scene.mermaid, themeName);
   }
 
   if (scene.code) {
-    return codeToDocument(scene.code);
+    return codeToDocument(scene.code, themeName);
   }
 
-  return semanticHtmlToDocument(scene.html ?? '');
+  return semanticHtmlToDocument(scene.html ?? '', themeName);
 }
 
-async function mermaidToDocument(diagram) {
+async function mermaidToDocument(diagram, themeName) {
+  const theme = sceneTheme(themeName);
+
   try {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      ...mermaidThemeConfig(theme),
+    });
     const renderId = `mermaid-${crypto.randomUUID()}`;
-    const { svg } = await mermaid.render(renderId, withMermaidFocusClasses(diagram));
-    return constrainHtml(`<main class="mermaid-scene">${svg}</main>`, mermaidSceneStyles());
+    const { svg } = await mermaid.render(renderId, withMermaidFocusClasses(diagram, theme));
+    return constrainHtml(`<main class="mermaid-scene">${svg}</main>`, mermaidSceneStyles(), '', theme);
   } catch (error) {
     return constrainHtml(
       `<main class="mermaid-error"><h1>Mermaid render error</h1><pre>${escapeHtml(error.message)}</pre></main>`,
       mermaidSceneStyles(),
+      '',
+      theme,
     );
   }
 }
 
-function withMermaidFocusClasses(diagram) {
-  if (!/^\s*(flowchart|graph)\b/i.test(diagram)) {
+function withMermaidFocusClasses(diagram, theme) {
+  if (!/^\s*(?:---[\s\S]*?---\s*)?(flowchart|graph)\b/i.test(diagram)) {
     return diagram;
   }
 
   return `${diagram.trimEnd()}
 
-  classDef active fill:#fde68a,stroke:#f59e0b,stroke-width:3px,color:#0f172a;
-  classDef highlight fill:#fde68a,stroke:#f59e0b,stroke-width:3px,color:#0f172a;
-  classDef muted fill:#e5e7eb,stroke:#94a3b8,color:#64748b;
-  classDef emphasis fill:#dbeafe,stroke:#2563eb,stroke-width:3px,color:#0f172a;
-  classDef success fill:#dcfce7,stroke:#16a34a,stroke-width:3px,color:#14532d;
-  classDef danger fill:#fee2e2,stroke:#dc2626,stroke-width:3px,color:#7f1d1d;
-`;
+${mermaidFocusClassDefs(theme)}`;
 }
 
-async function codeToDocument(code) {
+async function codeToDocument(code, themeName) {
+  const theme = sceneTheme(themeName);
   const codeHtml = await codeToHtml(code.content, {
     lang: code.language || 'text',
-    theme: 'github-dark',
+    theme: shikiTheme(theme),
     transformers: [codeLineTransformer(code)],
   });
 
@@ -109,6 +122,7 @@ async function codeToDocument(code) {
     `<main class="code-scene">${title}<div class="code-frame">${codeHtml}</div></main>`,
     codeSceneStyles(),
     fitSceneScript('.code-scene', '.code-frame'),
+    theme,
   );
 }
 
@@ -139,7 +153,7 @@ function extractText(node) {
   return (node.children ?? []).map(extractText).join('');
 }
 
-function constrainHtml(html, extraStyles = '', extraScript = '') {
+function constrainHtml(html, extraStyles = '', extraScript = '', theme = sceneTheme()) {
   return `<!doctype html>
 <html>
   <head>
@@ -160,6 +174,8 @@ function constrainHtml(html, extraStyles = '', extraScript = '') {
       *::after {
         box-sizing: border-box;
       }
+
+      ${sceneThemeCssVariables(theme)}
 
       body {
         position: relative;
@@ -210,11 +226,14 @@ function fitSceneScript(sceneSelector, contentSelector) {
   `;
 }
 
-function semanticHtmlToDocument(html) {
+function semanticHtmlToDocument(html, themeName) {
+  const theme = sceneTheme(themeName);
+
   return constrainHtml(
     `<main class="semantic-scene-fit"><div class="semantic-scene-content">${sanitizeSemanticHtml(html)}</div></main>`,
     semanticSceneStyles(),
     semanticSceneScript(),
+    theme,
   );
 }
 
@@ -281,9 +300,9 @@ function sanitizeAttributes(node) {
 function semanticSceneStyles() {
   return `
       body {
-        color: #18202a;
-        background: #f7fafc;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--scene-color-text);
+        background: var(--scene-color-surface);
+        font-family: var(--scene-font-sans);
       }
 
       .semantic-scene-fit {
@@ -365,15 +384,15 @@ function semanticSceneStyles() {
         width: 100%;
         border-collapse: collapse;
         overflow: hidden;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        background: #ffffff;
+        border: var(--scene-stroke-width) solid var(--scene-color-border);
+        border-radius: var(--scene-radius);
+        background: var(--scene-color-panel);
       }
 
       th,
       td {
         padding: 14px 16px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: var(--scene-stroke-width) solid var(--scene-color-border-subtle);
         text-align: left;
         vertical-align: top;
       }
@@ -384,8 +403,8 @@ function semanticSceneStyles() {
       }
 
       th {
-        color: #0f172a;
-        background: #e8edf4;
+        color: var(--scene-color-text);
+        background: var(--scene-color-panel-alt);
         font-weight: 720;
       }
 
@@ -393,15 +412,15 @@ function semanticSceneStyles() {
         max-width: 100%;
         padding: 20px;
         overflow: auto;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        color: #f8fafc;
-        background: #17202a;
+        border: var(--scene-stroke-width) solid var(--scene-color-border);
+        border-radius: var(--scene-radius);
+        color: var(--scene-color-text-inverse);
+        background: var(--scene-color-code-surface);
       }
 
       code,
       pre {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-family: var(--scene-font-mono);
       }
 
       code {
@@ -415,33 +434,33 @@ function semanticSceneStyles() {
 
       mark,
       .highlight {
-        color: #0f172a;
-        background: #fde68a;
-        box-shadow: inset 0 -0.18em 0 #f59e0b;
+        color: var(--scene-color-text);
+        background: var(--scene-color-focus);
+        box-shadow: inset 0 -0.18em 0 var(--scene-color-focus-strong);
       }
 
       td.highlight,
       th.highlight {
-        background: #fef3c7;
+        background: var(--scene-color-focus);
       }
 
       .muted {
-        color: #64748b;
+        color: var(--scene-color-muted);
       }
 
       .emphasis {
-        color: #0f172a;
+        color: var(--scene-color-text);
         font-weight: 760;
       }
 
       .danger {
-        color: #991b1b;
-        background: #fee2e2;
+        color: var(--scene-color-danger-text);
+        background: var(--scene-color-danger-soft);
       }
 
       .success {
-        color: #166534;
-        background: #dcfce7;
+        color: var(--scene-color-success-text);
+        background: var(--scene-color-success-soft);
       }
   `;
 }
@@ -453,9 +472,9 @@ function semanticSceneScript() {
 function codeSceneStyles() {
   return `
       body {
-        color: #dbe5ee;
-        background: #0f1419;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--scene-color-text-inverse);
+        background: var(--scene-color-code-page);
+        font-family: var(--scene-font-sans);
       }
 
       .code-scene {
@@ -474,7 +493,7 @@ function codeSceneStyles() {
         top: 24px;
         left: 48px;
         right: 48px;
-        color: #a7b4c2;
+        color: var(--scene-color-muted-inverse);
         font-size: 18px;
         line-height: 1.2;
         font-weight: 650;
@@ -486,10 +505,10 @@ function codeSceneStyles() {
         left: 50%;
         width: 1040px;
         overflow: hidden;
-        border: 1px solid #2b3642;
-        border-radius: 8px;
-        background: #0d1117;
-        box-shadow: 0 24px 70px rgb(0 0 0 / 0.32);
+        border: var(--scene-stroke-width) solid var(--scene-color-border-inverse);
+        border-radius: var(--scene-radius);
+        background: var(--scene-color-code-surface);
+        box-shadow: var(--scene-shadow);
         transform-origin: center center;
       }
 
@@ -502,7 +521,7 @@ function codeSceneStyles() {
 
       .code-frame code {
         display: grid;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-family: var(--scene-font-mono);
         font-size: 20px;
         line-height: 1.5;
       }
@@ -520,29 +539,29 @@ function codeSceneStyles() {
         position: absolute;
         left: 24px;
         width: 30px;
-        color: #6e7681;
+        color: var(--scene-color-muted-inverse);
         text-align: right;
       }
 
       .code-line.is-focused {
-        background: rgb(251 191 36 / 0.18);
-        box-shadow: inset 4px 0 0 #f59e0b;
+        background: color-mix(in srgb, var(--scene-color-focus) 22%, transparent);
+        box-shadow: inset 4px 0 0 var(--scene-color-focus-strong);
       }
 
       .code-line.is-added {
-        background: rgb(22 163 74 / 0.2);
+        background: color-mix(in srgb, var(--scene-color-success) 22%, transparent);
       }
 
       .code-line.is-added::before {
-        color: #86efac;
+        color: var(--scene-color-success-soft);
       }
 
       .code-line.is-removed {
-        background: rgb(220 38 38 / 0.2);
+        background: color-mix(in srgb, var(--scene-color-danger) 22%, transparent);
       }
 
       .code-line.is-removed::before {
-        color: #fca5a5;
+        color: var(--scene-color-danger-soft);
       }
   `;
 }
@@ -555,7 +574,7 @@ function mermaidSceneStyles() {
         display: grid;
         place-items: center;
         padding: 40px;
-        background: #f7fafc;
+        background: var(--scene-color-surface);
       }
 
       .mermaid-scene svg {
@@ -570,9 +589,9 @@ function mermaidSceneStyles() {
         height: 100%;
         padding: 32px;
         overflow: auto;
-        color: #7f1d1d;
-        background: #fff1f2;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        color: var(--scene-color-danger-text);
+        background: var(--scene-color-danger-soft);
+        font-family: var(--scene-font-mono);
       }
 
       .mermaid-error h1 {

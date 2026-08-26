@@ -7,10 +7,12 @@ const playToggleButton = document.querySelector('#play-toggle-button');
 const stopButton = document.querySelector('#stop-button');
 const nextButton = document.querySelector('#next-button');
 const status = document.querySelector('#scene-status');
+const themeSelect = document.querySelector('#theme-select');
 
 const state = {
   scenes: [],
   currentIndex: 0,
+  activeTheme: localStorage.getItem('explain-visually-theme') || 'default',
   isPlaying: false,
   isPaused: false,
   activeUtterance: null,
@@ -30,7 +32,7 @@ async function renderScene(index) {
   }
 
   state.currentIndex = clampIndex(index);
-  frame.srcdoc = await sceneToDocument(state.scenes[state.currentIndex]);
+  frame.srcdoc = await sceneToDocument(state.scenes[state.currentIndex], { theme: state.activeTheme });
   updateStatus();
   persistCurrentScene();
 }
@@ -45,6 +47,7 @@ function updateStatus() {
   nextButton.disabled = state.scenes.length === 0 || state.currentIndex >= state.scenes.length - 1;
   playToggleButton.setAttribute('aria-label', state.isPlaying && !state.isPaused ? 'Pause' : 'Play');
   playToggleButton.classList.toggle('is-playing', state.isPlaying && !state.isPaused);
+  themeSelect.value = state.activeTheme;
 }
 
 async function persistCurrentScene() {
@@ -249,6 +252,11 @@ playToggleButton.addEventListener('click', togglePlayback);
 stopButton.addEventListener('click', stopPlayback);
 nextButton.addEventListener('click', () => {
   void stepScene(1);
+});
+themeSelect.addEventListener('change', () => {
+  state.activeTheme = themeSelect.value;
+  localStorage.setItem('explain-visually-theme', state.activeTheme);
+  void renderScene(state.currentIndex);
 });
 
 speechSynthesis.addEventListener('voiceschanged', pickDanielVoice);

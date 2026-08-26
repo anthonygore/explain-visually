@@ -40,7 +40,7 @@ Accepted request body shapes:
 ```json
 {
   "narration": "Speakable narration text.",
-  "mermaid": "flowchart LR\n  A[Input] --> B[Output]"
+  "mermaid": "---\ntitle: Input To Output\n---\nflowchart LR\n  A[Input] --> B[Output]"
 }
 ```
 
@@ -60,7 +60,7 @@ Accepted request body shapes:
 [
   {
     "narration": "First scene.",
-    "mermaid": "flowchart LR\n  A[Browser] --> B[API]"
+    "mermaid": "---\ntitle: Browser To API\n---\nflowchart LR\n  A[Browser] --> B[API]"
   },
   {
     "narration": "Second scene.",
@@ -89,6 +89,8 @@ Scene properties:
 - `minDuration`: optional non-negative number in milliseconds. Defaults to `2000`.
 
 Each scene must include one of `html`, `mermaid`, or `code`. Do not send more than one scene type unless you intend the frontend to prefer this order: `mermaid`, then `code`, then `html`.
+
+The frontend applies one shared user-selected theme across semantic HTML, Mermaid diagrams, and code scenes. Do not include custom layout CSS, Mermaid baseline `classDef` styling, or inline visual styling in scene payloads; use semantic markup and approved classes.
 
 ### POST /api/clear_scenes
 

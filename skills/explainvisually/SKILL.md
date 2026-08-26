@@ -3,7 +3,7 @@ name: explainvisually
 description: Create visual explainer scenes using the local Explain Visually app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
-  version: 2026-08-26-1935
+  version: 2026-08-27-0954
 ---
 
 # Explain Visually
@@ -55,6 +55,18 @@ Choose one visual type:
 - `mermaid` for processes, relationships, state, and flow charts.
 - `html` for text, lists, definitions, comparisons, and tables.
 - `code` for short source excerpts, diffs, and line focus.
+
+The frontend applies one shared user-selected theme across all visual types. Do not add inline colors, layout CSS, Mermaid baseline `classDef` styling, custom fonts, custom borders, custom backgrounds, or theme names in scene payloads. Use semantic markup and approved focus classes only.
+
+When using `mermaid`, give every diagram a clear title using Mermaid frontmatter:
+
+```mermaid
+---
+title: Request Flow
+---
+flowchart LR
+  browser[Browser] --> server[Server]
+```
 
 ### 3. Insert titles
 
@@ -169,8 +181,9 @@ Look for and fix:
 - After scenes have been split, review reused visuals for accidental drift: unnecessary label changes, reordered nodes or rows, repeated styling blocks.
 - Omit `minDuration` when there is narration unless extra silent reading time is needed. Use `minDuration` for scenes with no narration.
 - Do not write layout CSS.
+- Do not write inline visual styling or theme names. The frontend's shared theme controls fonts, colors, borders, strokes, backgrounds, radii, shadows, and focus colors.
 - For HTML, use semantic tags only and approved classes from `api-docs.md`.
-- For Mermaid, do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
+- For Mermaid, include a diagram title in frontmatter and do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
 - Do not send more than one visual type in a scene unless the user explicitly asks for fallback behavior.
 - Ensure the final payload shape is `{ "version": "<metadata.version>", "scenes": [...] }`, using the `metadata.version` value from this skill.
 
@@ -277,7 +290,7 @@ For Mermaid flowcharts and graphs, add one of the approved focus classes to the 
 ```json
 {
   "narration": "The browser starts by sending a request.",
-  "mermaid": "flowchart LR\n  browser[Browser] --> server[Server]\n  server --> browser\n\n  class browser active;"
+  "mermaid": "---\ntitle: Browser Request\n---\nflowchart LR\n  browser[Browser] --> server[Server]\n  server --> browser\n\n  class browser active;"
 }
 ```
 
