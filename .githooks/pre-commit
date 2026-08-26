@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+SKILL_PATH="skills/explainvisually/SKILL.md"
+
+if git diff --cached --quiet -- "$SKILL_PATH"; then
+  exit 0
+fi
+
+npm run bump-skill-version
+git add "$SKILL_PATH"

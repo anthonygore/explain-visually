@@ -3,7 +3,7 @@ name: explainvisually
 description: Create visual explainer scenes using the local Code Explainer app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
-  version: 2026-08-26-1315
+  version: 2026-08-26-1322
 ---
 
 # Explain Visually
@@ -24,7 +24,6 @@ Turn the user's topic into a small ordered scene plan that will be rendered as a
 Since this will be a video-like presentation, keep the content terse and simple.
 
 The main artifact you will create is a JSON scene plan.
-
 ## Process
 
 1. Write the narration
