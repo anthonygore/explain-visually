@@ -25,6 +25,7 @@ Since this will be a video-like presentation, keep the content terse and simple.
 
 The main artifact you will create is a JSON scene plan.
 
+
 ## Process
 
 1. Write the narration
