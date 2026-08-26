@@ -3,7 +3,7 @@ name: explainvisually
 description: Create visual explainer scenes using the local Code Explainer app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
-  version: 2026-08-26-1322
+  version: 2026-08-26-1404
 ---
 
 # Explain Visually
@@ -80,11 +80,19 @@ Then insert an agenda scene at the beginning.
 
 ### 4. Split scenes for focus
 
-As per step 2, scenes will generally be based around one idea. 
+As per step 2, scenes will generally be based around one idea. The narration may still contain several clauses or sentence parts.
 
-But, ideally the screen should have one obvious thing to focus on. So we may need to split the scene in order to manage visual focus better.
+Now split scenes into attention beats. A beat is the smallest useful unit of explanation: one abstract claim, one process step, one listed item, one side of a contrast, one cause, one effect, one example, or one takeaway.
 
-For example, consider this scene where there is a lengthy narration and a lot on screen.
+Each beat should have one attention mode:
+
+- `whole`: the narration refers to the overall concept, structure, or state. Do not add a narrow highlight.
+- `focus`: the narration refers to one concrete visual target. Highlight exactly that target.
+- `compare`: the narration explicitly compares two targets. Highlight only those compared targets.
+
+Do not add highlights just because something is important. Add highlights when the narration points to a concrete target that the viewer should look at.
+
+For example, consider this scene:
 
 ```json
 {
@@ -93,7 +101,17 @@ For example, consider this scene where there is a lengthy narration and a lot on
 }
 ```
 
-You can split the scene on each focus change by changing the highlight. Be sure to preserve the original narration and repeat the same visual with only highlight changes.
+The narration can be fragmented into beats:
+
+1. The request describes what the browser wants. It includes 
+2. a method like GET or POST, 
+3. a path, 
+4. headers, 
+5. and sometimes a body.
+
+The first beat is a `whole` beat: it introduces the request as a complete object, so the visual should show the whole table with no narrow highlight. The remaining beats are `focus` beats: each one names a specific part, so each scene reuses the same table and highlights exactly that part.
+
+Split the scene when the attention mode changes or when the concrete focus target changes. When reusing the same visual, preserve the original narration order and repeat the same visual with only the highlight changed.
 
 ```json
 [
@@ -125,6 +143,15 @@ Indicators that a scene should be split:
 - The narration explains multiple steps or elements
 - The narration is longer than 20 words
 - There is dense information on screen
+- Two adjacent clauses would make the viewer look at different parts of the visual
+- An abstract claim is followed by concrete details, examples, causes, effects, steps, or listed items
+
+Before moving on, review each split scene:
+
+- If the attention mode is `whole`, remove narrow highlights.
+- If the attention mode is `focus`, use exactly one highlighted node, edge, row, cell, word, phrase, or code line group.
+- If the attention mode is `compare`, use multiple highlights only when the narration explicitly compares those targets.
+- If adjacent scenes reuse the same diagram, table, or code block, change only the highlight unless the narration clearly introduces a new visual state.
 
 Use the renderer's supported highlight mechanisms:
 
@@ -136,7 +163,7 @@ Use the renderer's supported highlight mechanisms:
 
 Before completion, do another pass over the plan to review it.
 
-The main things to look for and fix:
+Look for and fix:
 
 - Ensure narration contains only speakable words
 - After scenes have been split, review reused visuals for accidental drift: unnecessary label changes, reordered nodes or rows, repeated styling blocks.
@@ -188,7 +215,7 @@ Once complete, report on:
 
 ### Titles
 
-Title and section-title scenes should orient the viewer, not explain the concept in detail. Use short narration such as "Let's learn about the web request-response loop." Move the actual explanation into later scenes.
+Title and section-title scenes should orient the viewer, not explain the concept.
 
 ### Content density
 
@@ -245,7 +272,7 @@ For HTML, add the class `highlight` to the element that should be emphasized. Pr
 }
 ```
 
-For Mermaid flowcharts and graphs, add one of the approved focus classes to the node being discussed. Do not define `classDef` styling in the scene; the frontend supplies those styles.
+For Mermaid flowcharts and graphs, add one of the approved focus classes to the node being discussed. Do not define `classDef` styling in the scene; the frontend supplies those styles. Highlight at most one Mermaid node or edge per scene. 
 
 ```json
 {
@@ -268,4 +295,4 @@ For code, use `focusLines` for the active line or lines. Use `addedLines`, `remo
 }
 ```
 
-Ideally the screen should have one obvious thing to focus on, so in most cases you should only highlight one thing per scene.
+Normally the screen will have one obvious thing to focus on, so in most cases you should only highlight one thing per scene. Use multiple highlights only for explicit comparisons, and mention the comparison in narration.
