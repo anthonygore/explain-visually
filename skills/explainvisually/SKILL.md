@@ -16,49 +16,113 @@ Local services:
 
 Before authoring scenes, read the API and renderer contract in `/Users/anthonygore/Documents/ChatGPT/Code Explainer/api-docs.md`.
 
-## Workflow
+## Purpose
 
-Turn the user's topic into a small ordered scene plan. Keep each scene focused on one idea.
+Turn the user's topic into a small ordered scene plan that will be rendered as a visual explainer. 
 
-## Structure
+Since this will be a video-like presentation, keep the content terse and simple.
 
-Before writing scenes, decide whether the explanation needs a title scene. For multi-part explanations, consider an opening agenda scene and brief section title scenes before each major idea.
+The main artifact you will create is a JSON scene plan.
 
-Title and section-title scenes should orient the viewer, not explain the concept in detail. Use short narration such as "Let's learn about the web request-response loop." Move the actual explanation into later scenes.
+## Process
 
-For each scene:
+1. Write the narration
+2. Create the visuals
+3. Insert titles (optional)
+4. Split scenes for focus
+5. Review
+6. Save plan (optional)
+7. Load plan
 
-- Write `narration` first.
-- Choose one visual type:
-  - `mermaid` for processes, relationships, state, and flow charts.
-  - `html` for text, lists, definitions, comparisons, and tables.
-  - `code` for short source excerpts, diffs, and line focus.
-- Omit `minDuration` when narration is enough to set the scene duration. Use it only when extra silent reading time is needed.
-- Prefer concise content over dense slides; the renderer scales oversized content down, which hurts readability.
+### 1. Write the narration
 
-Scene authoring rules:
+Write the narration first. The narration should satisfy the user's topic.
 
-- Do not write layout CSS.
-- For HTML, use semantic tags only and approved classes from `api-docs.md`.
-- For Mermaid, do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
-- Use highlights sparingly to direct attention.
-- Do not send more than one visual type in a scene unless the user explicitly asks for fallback behavior.
+Rules:
 
-## Visual Continuity
+- Be as concise as possible and use simple language where possible.
+- The narration will be read aloud, so do not include anything that cannot be used in TTS e.g. URLs.
+- The total length should be between 50 to 2000 words.
 
-When reusing a diagram, table, or code block across adjacent scenes, keep the underlying content structurally stable. Make the smallest possible change needed to express the new focus, usually only highlight metadata.
+### 2. Create the visuals
 
-Treat these as different cases:
+Now split the narration into scenes. Each scene should be one concise idea that has an obvious visual component.
 
-- Same visual, new focus: keep labels, ordering, wording, and layout stable; change only highlights.
-- New visual state: content may change, but narration should make the transition clear.
-- Different concept: use a new diagram, table, or code block.
+Choose one visual type:
 
-## Focus Pass
+- `mermaid` for processes, relationships, state, and flow charts.
+- `html` for text, lists, definitions, comparisons, and tables.
+- `code` for short source excerpts, diffs, and line focus.
 
-After drafting scenes, review them once for attention cues. If a scene explains multiple steps or elements, split it into adjacent scenes that reuse the same visual while highlighting the active node, edge, table cell, word, or code line.
+### 3. Insert titles
 
-When splitting a scene only to move focus across visual elements, preserve the original narration as closely as possible. Split it into short fragments instead of expanding it. Fragments may be sentence fragments, phrases, or single words if that keeps the narration compact and aligned with the highlighted element.
+If there are multiple, distinct, sections in the explanation, it may be necessary break it into sections. This is strictly optional and should not be done if the draft is clearly a single continuous idea. A good rule of thumb: if this were an article, would it have headings?
+
+The best way to do this is insert title scenes before each section.
+
+```json
+{
+  "html": "<section><h1>1. Request</h1></section>",
+  "minDuration": 2000
+}
+```
+
+Then insert an agenda scene at the beginning.
+
+```json
+{
+  "narration": "We'll cover the request, the server, and the response.",
+  "html": "<section><h1>Request-response loop</h1><ol><li>Request</li><li>Server</li><li>Response</li></ol></section>"
+}
+```
+
+### 4. Split scenes for focus
+
+As per step 2, scenes will generally be based around one idea. 
+
+But, ideally the screen should have one obvious thing to focus on. So we may need to split the scene in order to manage visual focus better.
+
+For example, consider this scene where there is a lengthy narration and a lot on screen.
+
+```json
+{
+  "narration": "The request describes what the browser wants. It includes a method like GET or POST, a path, headers, and sometimes a body.",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+}
+```
+
+You can split the scene on each focus change by changing the highlight. Be sure to preserve the original narration and repeat the same visual with only highlight changes.
+
+```json
+[
+{
+  "narration": "The request describes what the browser wants. It includes a ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "method like GET or POST, ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr class=\"highlight\"><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "a path, ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr class=\"highlight\"><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "headers, ",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr class=\"highlight\"><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+},
+{
+  "narration": "and sometimes a body.",
+  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr class=\"highlight\"><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
+}
+]
+```
+
+Indicators that a scene should be split:
+
+- The narration explains multiple steps or elements
+- The narration is longer than 20 words
+- There is dense information on screen
 
 Use the renderer's supported highlight mechanisms:
 
@@ -66,16 +130,30 @@ Use the renderer's supported highlight mechanisms:
 - HTML: `mark` or approved classes such as `highlight`, `success`, and `danger`.
 - Code: `focusLines`, `addedLines`, `removedLines`, and `diff`.
 
-Before saving the payload, review reused visuals for accidental drift: unnecessary label changes, reordered nodes or rows, repeated styling blocks, or `minDuration` on narrated scenes.
+### 5. Review
 
-## Preview
+Before completion, do another pass over the plan to review it.
 
-Save the exact scene payload in the project feedback directory before sending it:
+The main things to look for and fix:
+
+- Ensure narration contains only speakable words
+- After scenes have been split, review reused visuals for accidental drift: unnecessary label changes, reordered nodes or rows, repeated styling blocks.
+- Omit `minDuration` if there is no narration.
+- Do not write layout CSS.
+- For HTML, use semantic tags only and approved classes from `api-docs.md`.
+- For Mermaid, do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
+- Do not send more than one visual type in a scene unless the user explicitly asks for fallback behavior.
+
+### 6. Save plan
+
+If this is run in the local environment, save the exact scene payload in the project feedback directory before sending it:
 
 - Directory: `/Users/anthonygore/Documents/ChatGPT/Code Explainer/generated-scenes/`
 - Filename: use a timestamp and short topic slug, for example `2026-08-25-134500-web-request-response.json`.
 - File shape: `{ "scenes": [...] }`.
 - This directory is intentionally ignored by git so generated plans can be reviewed without polluting commits.
+
+### 7. Load plan
 
 Before creating a new explanation, clear the existing preview queue:
 
@@ -95,9 +173,14 @@ After loading scenes, report the saved JSON path to the user so they can use it 
 
 Do not render videos. Rendering is a separate user-directed step after the user has reviewed the loaded scenes.
 
-# Best practices
 
-## Choosing a scene type
+## Best practices
+
+### Titles
+
+Title and section-title scenes should orient the viewer, not explain the concept in detail. Use short narration such as "Let's learn about the web request-response loop." Move the actual explanation into later scenes.
+
+### Choosing a scene type
 
 Use `mermaid` for diagrams where automatic layout matters: flows, relationships, state, timelines, and similar visuals.
 
@@ -105,15 +188,49 @@ Use `html` for explanatory text, lists, definitions, comparisons, and tables.
 
 Use `code` for source code, config, terminal-like snippets, and diffs that need syntax highlighting or focused lines.
 
-## Content density
+### Content density
 
-Treat the 16:9 frame like a video canvas. Keep each scene focused on one main idea.
+Generally we don't want too much in a scene.
 
-The renderer can scale oversized content down, but dense scaled content becomes hard to read. Keep tables short, usually 2-4 columns and 2-5 body rows. Keep headings and paragraphs concise. Split dense explanations into multiple scenes instead of one crowded scene.
+Firstly, it can be hard to read. Treat the 16:9 frame like a video canvas. The renderer can scale oversized content down, but dense scaled content becomes hard to read. 
 
-For code, prefer focused excerpts over full files.
+More importantly, viewer's can generally only focus on one thing at a time. So keep each scene focused on one main idea. 
 
-## Highlighting
+Guidelines for density based on content:
+
+- Tables: usually 2-4 columns and 2-5 body rows. 
+- Keep headings and paragraphs concise. 
+- Diagrams should probably only have 2-8 nodes.
+- For code, prefer focused excerpts over full files.
+
+If you need more than this, the answer is usually to split dense explanations into multiple scenes instead of one crowded scene. 
+
+### Relationship between narration and scene
+
+[TBA]
+
+#### Text
+
+With text, don't simply print the narration to screen. The exception to this is when you have a concise key message or takeaway, or an important definition.
+
+Good - an important message can have matching text and narration
+Good - a heading can be read aloud
+Good - the narration has the key message, the text just focuses on the important part
+
+Bad - the narration is simply duplicating text on screen
+Bad - the narration and text are completely different
+
+### Visual continuity
+
+When reusing a diagram, table, or code block across adjacent scenes, keep the underlying content structurally stable. Make the smallest possible change needed to express the new focus, usually only highlight metadata.
+
+Treat these as different cases:
+
+- Same visual, new focus: keep labels, ordering, wording, and layout stable; change only highlights.
+- New visual state: content may change, but narration should make the transition clear.
+- Different concept: use a new diagram, table, or code block.
+
+### Focus attention
 
 Try to guide the viewer's attention and link what's on screen with what is being discussed. One way to do this is by highlighting.
 
@@ -150,41 +267,3 @@ For code, use `focusLines` for the active line or lines. Use `addedLines`, `remo
 ```
 
 Ideally the screen should have one obvious thing to focus on, so in most cases you should only highlight one thing per scene.
-
-## Split scenes for focus
-
-Ideally the screen should have one obvious thing to focus on. So what do you do when there is a lot of information on screen like in this example?
-
-```json
-{
-  "narration": "The request describes what the browser wants. It includes a method like GET or POST, a path, headers, and sometimes a body.",
-  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
-}
-```
-
-You can split the scene on each focus change by changing the highlight. Be sure to preserve the original narration and repeat the same visual with only highlight changes.
-
-```json
-[
-{
-  "narration": "The request describes what the browser wants. It includes a ",
-  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
-},
-{
-  "narration": "method like GET or POST, ",
-  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr class=\"highlight\"><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
-},
-{
-  "narration": "a path, ",
-  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr class=\"highlight\"><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
-},
-{
-  "narration": "headers, ",
-  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr class=\"highlight\"><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
-},
-{
-  "narration": "and sometimes a body.",
-  "html": "<section><h1>HTTP Request</h1><table><thead><tr><th>Part</th><th>Example</th><th>Meaning</th></tr></thead><tbody><tr><td>Method</td><td>GET</td><td>Read a resource</td></tr><tr><td>Path</td><td>/products/42</td><td>Which resource</td></tr><tr><td>Headers</td><td>Accept: text/html</td><td>Browser metadata</td></tr><tr class=\"highlight\"><td>Body</td><td>name=Ana</td><td>Data sent with POST</td></tr></tbody></table></section>"
-}
-]
-```
