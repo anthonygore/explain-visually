@@ -14,7 +14,7 @@ Local services:
 - Frontend: `http://127.0.0.1:5173`
 - API: `http://127.0.0.1:8787`
 
-Before authoring scenes, read the API and renderer contract in `/Users/anthonygore/Documents/ChatGPT/Code Explainer/api-docs.md`.
+Before authoring scenes, read the API and renderer contract in `api-docs.md` in this skill directory.
 
 ## Purpose
 
@@ -31,8 +31,9 @@ The main artifact you will create is a JSON scene plan.
 3. Insert titles (optional)
 4. Split scenes for focus
 5. Review
-6. Save plan (optional)
+6. Save plan
 7. Load plan
+8. Report
 
 ### 1. Write the narration
 
@@ -40,6 +41,7 @@ Write the narration first. The narration should satisfy the user's topic.
 
 Rules:
 
+- Always do this fresh i.e. don't refer to previous runs of this skill (unless the user asks you to) or preivously generated plans.
 - Be as concise as possible and use simple language where possible.
 - The narration will be read aloud, so do not include anything that cannot be used in TTS e.g. URLs.
 - The total length should be between 50 to 2000 words.
@@ -138,22 +140,25 @@ The main things to look for and fix:
 
 - Ensure narration contains only speakable words
 - After scenes have been split, review reused visuals for accidental drift: unnecessary label changes, reordered nodes or rows, repeated styling blocks.
-- Omit `minDuration` if there is no narration.
+- Omit `minDuration` when there is narration unless extra silent reading time is needed. Use `minDuration` for scenes with no narration.
 - Do not write layout CSS.
 - For HTML, use semantic tags only and approved classes from `api-docs.md`.
 - For Mermaid, do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
 - Do not send more than one visual type in a scene unless the user explicitly asks for fallback behavior.
+- Ensure the final payload shape is `{ "scenes": [...] }`.
 
 ### 6. Save plan
 
-If this is run in the local environment, save the exact scene payload in the project feedback directory before sending it:
+If this is run in a local workspace, save the exact scene payload before sending it:
 
-- Directory: `/Users/anthonygore/Documents/ChatGPT/Code Explainer/generated-scenes/`
+- Directory: `generated-scenes/` in the current workspace. Create it if the workspace is writable.
 - Filename: use a timestamp and short topic slug, for example `2026-08-25-134500-web-request-response.json`.
 - File shape: `{ "scenes": [...] }`.
-- This directory is intentionally ignored by git so generated plans can be reviewed without polluting commits.
+- If no writable workspace is available, skip saving and say that no local plan file was written.
 
 ### 7. Load plan
+
+Stop after loading scenes. Do not call `/render`; rendering is a separate user-directed step after the user has reviewed the loaded scenes.
 
 Before creating a new explanation, clear the existing preview queue:
 
@@ -166,27 +171,24 @@ Then send scenes to the preview queue:
 ```sh
 curl -X POST http://127.0.0.1:8787/add_scene \
   -H 'content-type: application/json' \
-  -d @/Users/anthonygore/Documents/ChatGPT/Code\ Explainer/generated-scenes/2026-08-25-134500-web-request-response.json
+  -d @generated-scenes/2026-08-25-134500-web-request-response.json
 ```
 
 After loading scenes, report the saved JSON path to the user so they can use it for feedback.
 
-Do not render videos. Rendering is a separate user-directed step after the user has reviewed the loaded scenes.
+### 8. Report
 
+Once complete, report on:
+
+- success or failure
+- the saved plan file
+- the frontend URL
 
 ## Best practices
 
 ### Titles
 
 Title and section-title scenes should orient the viewer, not explain the concept in detail. Use short narration such as "Let's learn about the web request-response loop." Move the actual explanation into later scenes.
-
-### Choosing a scene type
-
-Use `mermaid` for diagrams where automatic layout matters: flows, relationships, state, timelines, and similar visuals.
-
-Use `html` for explanatory text, lists, definitions, comparisons, and tables.
-
-Use `code` for source code, config, terminal-like snippets, and diffs that need syntax highlighting or focused lines.
 
 ### Content density
 

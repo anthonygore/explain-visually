@@ -30,7 +30,7 @@ http://127.0.0.1:8787
 
 ## Docs
 
-- API and renderer contract: `api-docs.md`
+- API and renderer contract: `skills/explainvisually/api-docs.md`
 - Codex skill: `skills/explainvisually/SKILL.md`
 
 ## Smoke Test
