@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "api": "node server.mjs",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "bump-skill-version": "node scripts/bump-skill-version.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1",

@@ -3,6 +3,7 @@ name: explainvisually
 description: Create visual explainer scenes using the local Code Explainer app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
+  version: 2026-08-26-1315
 ---
 
 # Explain Visually
@@ -145,7 +146,7 @@ The main things to look for and fix:
 - For HTML, use semantic tags only and approved classes from `api-docs.md`.
 - For Mermaid, do not define baseline diagram styling. The frontend owns the Mermaid theme and approved focus classes.
 - Do not send more than one visual type in a scene unless the user explicitly asks for fallback behavior.
-- Ensure the final payload shape is `{ "scenes": [...] }`.
+- Ensure the final payload shape is `{ "version": "<metadata.version>", "scenes": [...] }`, using the `metadata.version` value from this skill.
 
 ### 6. Save plan
 
@@ -153,7 +154,7 @@ If this is run in a local workspace, save the exact scene payload before sending
 
 - Directory: `generated-scenes/` in the current workspace. Create it if the workspace is writable.
 - Filename: use a timestamp and short topic slug, for example `2026-08-25-134500-web-request-response.json`.
-- File shape: `{ "scenes": [...] }`.
+- File shape: `{ "version": "<metadata.version>", "scenes": [...] }`, using the `metadata.version` value from this skill.
 - If no writable workspace is available, skip saving and say that no local plan file was written.
 
 ### 7. Load plan
