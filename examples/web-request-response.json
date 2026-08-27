@@ -1,0 +1,13 @@
+{
+  "version": "2026-08-27-0954",
+  "scenes": [
+    {
+      "narration": "A browser sends a request to an API, and the API sends a response back.",
+      "mermaid": "---\ntitle: Request And Response\n---\nflowchart LR\n  browser[Browser] --> api[API]\n  api --> browser"
+    },
+    {
+      "narration": "The request carries the method and path that describe what the browser wants.",
+      "html": "<section><h1>Request</h1><dl><dt>Method</dt><dd>GET</dd><dt>Path</dt><dd>/products/42</dd></dl></section>"
+    }
+  ]
+}

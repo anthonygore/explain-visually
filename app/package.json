@@ -1,0 +1,24 @@
+{
+  "name": "explain-visually",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "api": "node server.mjs",
+    "start": "node scripts/start.mjs",
+    "test:mcp": "node --test ../plugin/mcp/test.mjs",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "bump-skill-version": "node scripts/bump-skill-version.mjs",
+    "install-git-hooks": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1",
+    "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "mermaid": "^11.17.1",
+    "shiki": "^4.4.3"
+  }
+}

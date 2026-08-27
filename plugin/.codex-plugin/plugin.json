@@ -1,0 +1,25 @@
+{
+  "name": "explain-visually",
+  "version": "0.1.0",
+  "description": "Create and render visual explanations with diagrams, semantic HTML, and focused code scenes.",
+  "author": {
+    "name": "Explain Visually contributors"
+  },
+  "license": "MIT",
+  "keywords": ["visual explanations", "diagrams", "mermaid", "teaching"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Explain Visually",
+    "shortDescription": "Build visual explanations with scenes",
+    "longDescription": "Create concise narrated explanations using Mermaid diagrams, semantic HTML, and focused code scenes, then preview or render them in the Explain Visually app.",
+    "developerName": "Explain Visually contributors",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Explain this topic visually",
+      "Turn this code into a visual explainer",
+      "Preview the current explanation"
+    ]
+  }
+}

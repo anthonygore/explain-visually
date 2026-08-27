@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "explain_visually": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/mcp/explain-visually.mjs"],
+      "env": {
+        "EXPLAIN_VISUALLY_API_URL": "http://127.0.0.1:8787",
+        "EXPLAIN_VISUALLY_FRONTEND_URL": "http://127.0.0.1:5173/"
+      },
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 3600
+    }
+  }
+}
