@@ -41,6 +41,7 @@ test('MCP server exposes the Explain Visually contract', async (t) => {
 
   const initialized = await server.request(1, 'initialize', { protocolVersion: '2025-06-18' });
   assert.equal(initialized.result.serverInfo.name, 'explain-visually');
+  assert.deepEqual(Object.keys(initialized.result.capabilities), ['tools', 'resources']);
 
   const listed = await server.request(2, 'tools/list');
   assert.deepEqual(
@@ -50,4 +51,10 @@ test('MCP server exposes the Explain Visually contract', async (t) => {
 
   const preview = await server.request(3, 'tools/call', { name: 'get_preview_info', arguments: {} });
   assert.match(preview.result.content[0].text, /frontendUrl/);
+
+  const resources = await server.request(4, 'resources/list');
+  assert.equal(resources.result.resources[0].mimeType, 'text/html;profile=mcp-app');
+
+  const resource = await server.request(5, 'resources/read', { uri: resources.result.resources[0].uri });
+  assert.match(resource.result.contents[0].text, /ui\/notifications\/tool-result/);
 });

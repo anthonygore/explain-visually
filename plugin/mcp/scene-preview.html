@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 12px; color: CanvasText; background: Canvas; }
+    header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    h1 { font-size: 15px; margin: 0; }
+    #count { font-size: 12px; opacity: .65; }
+    nav { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; }
+    button { border: 1px solid color-mix(in srgb, CanvasText 22%, transparent); border-radius: 6px; background: transparent; color: inherit; padding: 6px 9px; cursor: pointer; white-space: nowrap; }
+    button[aria-selected="true"] { background: color-mix(in srgb, LinkText 18%, transparent); border-color: LinkText; }
+    main { border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding-top: 12px; }
+    #narration { font-size: 13px; line-height: 1.45; margin: 0 0 12px; }
+    #visual { overflow: auto; max-height: 420px; }
+    #renderer { width: 100%; height: 390px; border: 0; border-radius: 6px; background: Canvas; }
+    #renderer[hidden] { display: none; }
+    #visual section { font-size: 14px; }
+    #visual pre { white-space: pre-wrap; overflow: auto; padding: 10px; border-radius: 6px; background: color-mix(in srgb, CanvasText 8%, Canvas); }
+    #visual table { border-collapse: collapse; width: 100%; }
+    #visual th, #visual td { border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); padding: 6px; text-align: left; }
+    #empty { opacity: .7; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header><h1>Explain Visually</h1><span id="count"></span></header>
+  <nav id="scenes" aria-label="Scenes"></nav>
+  <main>
+    <p id="empty">Load scenes to preview the explanation here.</p>
+    <iframe id="renderer" title="Explain Visually scene renderer" hidden></iframe>
+    <p id="narration"></p>
+    <div id="visual"></div>
+  </main>
+  <script>
+    const state = { scenes: [], currentIndex: 0 };
+    const scenesEl = document.getElementById('scenes');
+    const countEl = document.getElementById('count');
+    const emptyEl = document.getElementById('empty');
+    const rendererEl = document.getElementById('renderer');
+    const narrationEl = document.getElementById('narration');
+    const visualEl = document.getElementById('visual');
+
+    function render(data) {
+      state.scenes = Array.isArray(data?.scenes) ? data.scenes : [];
+      state.currentIndex = Math.max(0, Math.min(data?.currentIndex || 0, state.scenes.length - 1));
+      countEl.textContent = state.scenes.length ? `${state.currentIndex + 1} / ${state.scenes.length}` : '';
+      scenesEl.replaceChildren(...state.scenes.map((scene, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(index + 1);
+        button.setAttribute('aria-label', `Scene ${index + 1}`);
+        button.setAttribute('aria-selected', String(index === state.currentIndex));
+        button.onclick = () => { state.currentIndex = index; render(state); };
+        return button;
+      }));
+      const scene = state.scenes[state.currentIndex];
+      emptyEl.hidden = Boolean(scene);
+      rendererEl.hidden = !data?.frontendUrl || !scene;
+      if (data?.frontendUrl && rendererEl.src !== data.frontendUrl) rendererEl.src = data.frontendUrl;
+      narrationEl.textContent = scene?.narration || '';
+      visualEl.replaceChildren();
+      if (!scene) return;
+      if (typeof scene.html === 'string') {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = scene.html;
+        wrapper.querySelectorAll('script, style, iframe, object, embed').forEach((node) => node.remove());
+        visualEl.append(wrapper);
+      } else if (typeof scene.mermaid === 'string') {
+        const pre = document.createElement('pre');
+        pre.textContent = scene.mermaid;
+        visualEl.append(pre);
+      } else if (scene.code && typeof scene.code === 'object') {
+        const pre = document.createElement('pre');
+        pre.textContent = scene.code.code || scene.code.content || '';
+        visualEl.append(pre);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.source !== window.parent) return;
+      const message = event.data;
+      if (message?.jsonrpc !== '2.0') return;
+      if (message.method === 'ui/notifications/tool-result') render(message.params?.structuredContent);
+    }, { passive: true });
+
+    if (window.openai?.toolOutput) render(window.openai.toolOutput);
+  </script>
+</body>
+</html>

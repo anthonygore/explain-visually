@@ -3,19 +3,19 @@ name: explainvisually
 description: Create visual explainer scenes using the local Explain Visually app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
-  version: 2026-08-27-1116
+  version: 2026-08-27-1148
 ---
 
 # Explain Visually
 
-Use the local Explain Visually app as the preview engine for short visual explanations.
+Use Explain Visually as an inline preview engine for short visual explanations.
 
-Local services:
+The MCP server renders the loaded scene plan inline in the conversation. The local services are still available for development playback and video rendering:
 
 - Frontend: `http://127.0.0.1:5173`
 - API: `http://127.0.0.1:8787`
 
-Before authoring scenes, read the API and renderer contract in `api-docs.md` in this skill directory. Use the `explain_visually` MCP server for app operations when it is available. If it is unavailable, report that the plugin MCP connection is not loaded and stop; do not search the current workspace for an app directory or improvise a replacement integration. Use the HTTP endpoints only when the user explicitly requests the local-development fallback.
+Before authoring scenes, read the API and renderer contract in `api-docs.md` in this skill directory. Use the `explain_visually` MCP server for app operations when it is available; its `add_scenes` result is the inline preview. If it is unavailable, report that the plugin MCP connection is not loaded and stop; do not search the current workspace for an app directory or improvise a replacement integration. Use the HTTP endpoints only when the user explicitly requests the local-development fallback.
 
 
 ## Purpose
@@ -222,7 +222,7 @@ curl -X POST http://127.0.0.1:8787/add_scene \
   -d @generated-scenes/2026-08-25-134500-web-request-response.json
 ```
 
-After loading scenes, report the saved JSON path to the user so they can use it for feedback.
+After loading scenes, the inline preview is the primary result. Also report the saved JSON path so the user can use it for feedback.
 
 ### 8. Report
 
@@ -230,7 +230,7 @@ Once complete, report on:
 
 - success or failure
 - the saved plan file
-- the frontend URL
+- the frontend URL only as a local playback fallback
 
 ## Best practices
 

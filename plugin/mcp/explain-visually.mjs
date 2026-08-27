@@ -1,10 +1,31 @@
 #!/usr/bin/env node
 
+import { readFile } from 'node:fs/promises';
 import { stdin, stdout } from 'node:process';
 
 const API_URL = (process.env.EXPLAIN_VISUALLY_API_URL || 'http://127.0.0.1:8787').replace(/\/$/, '');
 const FRONTEND_URL = process.env.EXPLAIN_VISUALLY_FRONTEND_URL || 'http://127.0.0.1:5173/';
 const PROTOCOL_VERSION = '2025-06-18';
+const SERVER_VERSION = '0.1.1';
+const PREVIEW_RESOURCE_URI = 'ui://explain-visually/scene-preview.html';
+const previewResourcePath = new URL('./scene-preview.html', import.meta.url);
+const frontendOrigin = new URL(FRONTEND_URL).origin;
+
+const sceneSchema = {
+  type: 'array',
+  items: { type: 'object', additionalProperties: true },
+};
+
+const previewOutputSchema = {
+  type: 'object',
+  properties: {
+    scenes: sceneSchema,
+    currentIndex: { type: 'integer', minimum: 0 },
+    frontendUrl: { type: 'string' },
+  },
+  required: ['scenes', 'currentIndex', 'frontendUrl'],
+  additionalProperties: false,
+};
 
 const tools = [
   {
@@ -23,11 +44,23 @@ const tools = [
       required: ['scenes'],
       additionalProperties: false,
     },
+    outputSchema: previewOutputSchema,
+    _meta: {
+      ui: { resourceUri: PREVIEW_RESOURCE_URI },
+      'openai/outputTemplate': PREVIEW_RESOURCE_URI,
+      'openai/toolInvocation/invoking': 'Loading visual explanation',
+      'openai/toolInvocation/invoked': 'Visual explanation ready',
+    },
   },
   {
     name: 'get_scenes',
     description: 'Inspect the currently loaded scenes and selected scene index.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    outputSchema: previewOutputSchema,
+    _meta: {
+      ui: { resourceUri: PREVIEW_RESOURCE_URI },
+      'openai/outputTemplate': PREVIEW_RESOURCE_URI,
+    },
   },
   {
     name: 'set_current_scene',
@@ -78,15 +111,27 @@ function textResult(value) {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
 }
 
+function previewResult(value) {
+  return {
+    structuredContent: {
+      scenes: value.scenes || [],
+      currentIndex: value.currentIndex ?? 0,
+      frontendUrl: FRONTEND_URL,
+    },
+    content: [{ type: 'text', text: `Loaded ${value.scenes?.length || 0} visual scenes.` }],
+  };
+}
+
 async function callTool(name, args) {
   switch (name) {
     case 'clear_scenes':
       return textResult(await request('/api/clear_scenes', { method: 'POST' }));
     case 'add_scenes':
       if (!Array.isArray(args?.scenes)) throw new Error('scenes must be an array');
-      return textResult(await request('/add_scene', { method: 'POST', body: JSON.stringify(args.scenes) }));
+      await request('/add_scene', { method: 'POST', body: JSON.stringify(args.scenes) });
+      return previewResult(await request('/api/scenes'));
     case 'get_scenes':
-      return textResult(await request('/api/scenes'));
+      return previewResult(await request('/api/scenes'));
     case 'set_current_scene':
       return textResult(await request('/api/current_scene', { method: 'PUT', body: JSON.stringify({ currentIndex: args?.currentIndex }) }));
     case 'render_video':
@@ -106,11 +151,37 @@ async function handle(message) {
     if (message.method === 'initialize') {
       reply(message.id, {
         protocolVersion: message.params?.protocolVersion || PROTOCOL_VERSION,
-        capabilities: { tools: {} },
-        serverInfo: { name: 'explain-visually', version: '0.1.1' },
+        capabilities: { tools: {}, resources: {} },
+        serverInfo: { name: 'explain-visually', version: SERVER_VERSION },
       });
     } else if (message.method === 'tools/list') {
       reply(message.id, { tools });
+    } else if (message.method === 'resources/list') {
+      reply(message.id, {
+        resources: [{
+          uri: PREVIEW_RESOURCE_URI,
+          name: 'Explain Visually scene preview',
+          description: 'Inline scene preview for loaded visual explanations.',
+          mimeType: 'text/html;profile=mcp-app',
+        }],
+      });
+    } else if (message.method === 'resources/read') {
+      if (message.params?.uri !== PREVIEW_RESOURCE_URI) {
+        throw new Error(`Unknown resource: ${message.params?.uri}`);
+      }
+      reply(message.id, {
+        contents: [{
+          uri: PREVIEW_RESOURCE_URI,
+          mimeType: 'text/html;profile=mcp-app',
+          text: await readFile(previewResourcePath, 'utf8'),
+          _meta: {
+            ui: {
+              prefersBorder: true,
+              csp: { frameDomains: [frontendOrigin] },
+            },
+          },
+        }],
+      });
     } else if (message.method === 'tools/call') {
       reply(message.id, await callTool(message.params?.name, message.params?.arguments || {}));
     } else if (message.method === 'ping') {
