@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explain Visually"
+  short_description: "Build visual explanations with scenes"
+  default_prompt: "Use $explainvisually to explain this topic visually."
