@@ -19,6 +19,8 @@ npm start
 
 The preview is at `http://127.0.0.1:5173/` and the API is at `http://127.0.0.1:8787`.
 
+For local-only diagnostics, set `EXPLAIN_VISUALLY_ENV=development` in the root `.env` file. The default app mode is `development`; distribution installs should use `production` when they need production-like behavior.
+
 ## Codex
 
 The `plugin/` directory is the Codex plugin. Install that directory as a local plugin or add it to a local marketplace. Its manifest and `.mcp.json` start the MCP adapter and point it at the local API.

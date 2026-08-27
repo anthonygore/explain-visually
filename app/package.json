@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "bump-skill-version": "node scripts/bump-skill-version.mjs",
+    "sync:plugin": "node scripts/sync-plugin.mjs",
     "install-git-hooks": "git config core.hooksPath .githooks"
   },
   "devDependencies": {

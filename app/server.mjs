@@ -7,6 +7,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const PORT = Number(process.env.API_PORT ?? 8787);
+const APP_ENV = process.env.EXPLAIN_VISUALLY_ENV ?? 'development';
 const DEFAULT_MIN_DURATION = 2000;
 const VOICEBOX_URL = process.env.VOICEBOX_URL ?? 'http://127.0.0.1:17493';
 const VOICEBOX_PROFILE = process.env.VOICEBOX_PROFILE ?? 'George';
@@ -473,7 +474,7 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/health') {
-    sendJson(response, 200, { ok: true });
+    sendJson(response, 200, { ok: true, environment: APP_ENV });
     return;
   }
 

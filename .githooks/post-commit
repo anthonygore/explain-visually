@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+# Keep the locally installed plugin aligned with the commit just created.
+(cd app && npm run sync:plugin)

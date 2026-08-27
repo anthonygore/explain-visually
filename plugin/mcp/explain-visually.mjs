@@ -107,7 +107,7 @@ async function handle(message) {
       reply(message.id, {
         protocolVersion: message.params?.protocolVersion || PROTOCOL_VERSION,
         capabilities: { tools: {} },
-        serverInfo: { name: 'explain-visually', version: '0.1.0' },
+        serverInfo: { name: 'explain-visually', version: '0.1.1' },
       });
     } else if (message.method === 'tools/list') {
       reply(message.id, { tools });
