@@ -1,19 +1,21 @@
 # Explain Visually
 
-A local prototype for previewing and rendering generated visual explainer scenes.
+Explain Visually is a local visual explainer app and portable AI integration. The app previews and renders narrated scenes; the plugin bundles the scene-authoring skill and MCP adapter for Codex, Claude, and other MCP-capable harnesses.
+
+## Repository layout
+
+- `app/`: Vite frontend and Node API
+- `plugin/`: Codex plugin, skill, and standalone MCP server
+- `examples/`: valid scene payload examples
+- `INSTALL.md`: installation instructions
 
 ## Run
 
-Start the Node API in one terminal:
+From the `app/` directory, start both services together:
 
 ```sh
-npm run api
-```
-
-Start the Vite frontend in another terminal:
-
-```sh
-npm run dev
+npm install
+npm start
 ```
 
 Open:
@@ -30,10 +32,10 @@ http://127.0.0.1:8787
 
 ## Docs
 
-- API and renderer contract: `skills/explainvisually/api-docs.md`
-- Codex skill: `skills/explainvisually/SKILL.md`
+- API and renderer contract: `plugin/skills/explainvisually/api-docs.md`
+- Codex skill: `plugin/skills/explainvisually/SKILL.md`
 - Cross-harness installation: `INSTALL.md`
-- MCP adapter: `mcp/explain-visually.mjs`
+- MCP adapter: `plugin/mcp/explain-visually.mjs`
 
 ## Smoke Test
 

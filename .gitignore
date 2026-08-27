@@ -3,3 +3,6 @@ dist/
 renders/
 generated-scenes/
 .DS_Store
+*.log
+.env
+.env.local
