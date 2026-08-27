@@ -3,7 +3,7 @@ name: explainvisually
 description: Create visual explainer scenes using the local Explain Visually app. Use when the user asks to explain a topic, question, or code visually with this local renderer.
 metadata:
   short-description: Build visual explainer scenes
-  version: 2026-08-27-0954
+  version: 2026-08-27-1014
 ---
 
 # Explain Visually
@@ -15,7 +15,7 @@ Local services:
 - Frontend: `http://127.0.0.1:5173`
 - API: `http://127.0.0.1:8787`
 
-Before authoring scenes, read the API and renderer contract in `api-docs.md` in this skill directory.
+Before authoring scenes, read the API and renderer contract in `api-docs.md` in this skill directory. When the `explain_visually` MCP server is available, use its tools for app operations; use the HTTP endpoints only as a local-development fallback.
 
 ## Purpose
 
@@ -200,7 +200,14 @@ If this is run in a local workspace, save the exact scene payload before sending
 
 Stop after loading scenes. Do not call `/render`; rendering is a separate user-directed step after the user has reviewed the loaded scenes.
 
-Before creating a new explanation, clear the existing preview queue:
+When MCP is available, call these tools in order:
+
+1. `clear_scenes`
+2. `add_scenes` with the complete scene array
+
+Do not call `render_video` during the initial load. Rendering is a separate user-directed step after the user has reviewed the loaded scenes.
+
+For local development without MCP, clear the existing preview queue:
 
 ```sh
 curl -X POST http://127.0.0.1:8787/api/clear_scenes

@@ -32,6 +32,8 @@ http://127.0.0.1:8787
 
 - API and renderer contract: `skills/explainvisually/api-docs.md`
 - Codex skill: `skills/explainvisually/SKILL.md`
+- Cross-harness installation: `INSTALL.md`
+- MCP adapter: `mcp/explain-visually.mjs`
 
 ## Smoke Test
 
